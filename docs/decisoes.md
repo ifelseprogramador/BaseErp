@@ -130,3 +130,28 @@ nascerem dele) são de porte pequeno/médio (uma organização por vez, não
 milhões de linhas), então paginação/ordenação/filtro no servidor (via
 querystring, ver `components/search-box.tsx`) resolve sem o peso e a
 complexidade de API de uma lib de tabela completa.
+
+## 2026-09-24 — Prisma nasce deste commit; regra de acoplamento ganha uma exceção
+
+`/home/eduardo/code/prisma` foi criado como cópia integral deste
+repositório neste commit (`7eff4b8`, "Scaffold inicial do BaseERP") — ver
+`prisma/docs/decisoes.md` para o registro espelhado e todas as decisões
+específicas do vertical bordados a partir daqui.
+
+Uma correção de documentação feita lá foi replicada para cá (regra de
+manutenção em ação): a regra de acoplamento entre módulos (regra 8 de
+`src/modules/README.md`) ganhou uma nota de exceção — `schema.ts` de um
+módulo pode importar `schema.ts` de outro módulo diretamente (nunca o
+barrel), porque o Drizzle exige o objeto `pgTable` real para declarar uma
+foreign key. Essa exceção já valia implicitamente (é o mesmo padrão do
+mecano-erp), só não estava escrita; descoberta ao implementar
+`modules/pedidos/schema.ts` no Prisma, que referencia `modules/clientes/schema`
+e `modules/catalogo-bordado/schema` diretamente.
+
+Decisão em aberto do plano, registrada aqui por simetria: o módulo
+`clientes` (candidato natural a viver no BaseERP, por ser genérico o
+bastante para qualquer ramo) NÃO foi portado para cá ainda — foi criado
+direto em `prisma/src/modules/clientes/` (ver a decisão espelhada em
+`prisma/docs/decisoes.md`, "Onde o módulo `clientes` foi criado"). Fica
+como candidato a promoção para este template quando um segundo vertical
+precisar de cadastro de cliente.

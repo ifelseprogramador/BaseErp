@@ -70,6 +70,15 @@ src/modules/<modulo>/
    apagando a pasta + tirando a linha de `core/load-modules.ts`, sem
    quebrar import nenhum em outro lugar por acidente.
 
+   **Exceção restrita a `schema.ts` → `schema.ts`**: o Drizzle exige o
+   objeto `pgTable` real (não um tipo/barrel) para declarar uma foreign
+   key via `references(() => outraTabela.id)`. Por isso `schema.ts` de um
+   módulo PODE importar `schema.ts` de outro módulo diretamente — nunca o
+   barrel deve reexportar a tabela crua (isso vazaria a tabela para
+   qualquer um fazer query direta, fora de `withOrg()`/`withDb`). Fora de
+   `schema.ts`, a regra acima vale sem exceção (nota trazida do vertical
+   Prisma, `modules/pedidos/schema.ts` — ver docs/decisoes.md).
+
 9. **`registerModule()` em `module.ts`**, importado uma única vez a
    partir de `core/load-modules.ts` (o único arquivo que conhece a lista
    de módulos instalados).
