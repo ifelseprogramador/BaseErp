@@ -59,6 +59,44 @@ Rode `src/core/__tests__/rls-isolation.integration.test.ts` contra um
 Postgres com os dois papéis configurados para confirmar o isolamento de
 verdade (o teste documenta os passos no topo do arquivo).
 
+### Passo a passo com um projeto Supabase real
+
+1. Crie o projeto em [supabase.com](https://supabase.com) (região
+   `sa-east-1`, São Paulo).
+2. Em **Project Settings -> API**, copie `Project URL`, `anon public` key
+   e `service_role` key para `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
+3. Em **Project Settings -> Database -> Connection string -> URI**, copie
+   a **Direct connection** (porta 5432, host `db.<ref>.supabase.co`) para
+   `DATABASE_MIGRATION_URL` E, temporariamente, também para
+   `DATABASE_URL` (vamos trocar no passo 5).
+4. Rode `npm run db:migrate` — aplica as migrations do Drizzle e as
+   migrations custom, incluindo `0000_app_role.sql`, que cria o papel
+   `base_erp_app` (sem senha ainda).
+5. Defina uma senha para o papel de aplicação (no **SQL Editor** do
+   Supabase, ou via `psql` na direct connection):
+   ```sql
+   alter role base_erp_app with password '<senha forte, diferente da do postgres>';
+   ```
+   Troque `DATABASE_URL` para o **pooler em modo Transaction** (porta
+   6543, host `aws-0-<região>.pooler.supabase.com`) com esse papel —
+   **atenção ao formato do username**: o pooler (Supavisor) exige o
+   project ref como sufixo, `base_erp_app.<project-ref>`, não só
+   `base_erp_app` (sem o sufixo a conexão falha com
+   `FATAL: no tenant identifier provided`; validado contra um projeto
+   real em 2026-09-24, ver `docs/decisoes.md`).
+6. Rode `npm run db:seed` para criar a primeira organização/usuário e se
+   tornar o primeiro `platform_admin`.
+7. Valide o isolamento de verdade antes de confiar com dados reais:
+   ```bash
+   DATABASE_URL="postgresql://base_erp_app.<ref>:<senha>@aws-0-<região>.pooler.supabase.com:6543/postgres" \
+   NEXT_PUBLIC_SUPABASE_URL="https://<ref>.supabase.co" \
+   SUPABASE_SERVICE_ROLE_KEY="<service role key>" \
+   npx vitest run rls-isolation
+   ```
+   O teste cria e apaga usuários reais via Admin API — nunca rode isto
+   contra um projeto com dados de clientes de verdade.
+
 ## Scripts
 
 | Script                                                         | O que faz                                                   |

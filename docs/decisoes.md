@@ -204,3 +204,39 @@ integração gated por `DATABASE_URL` não é suficiente por si só — ele
 precisa ser executado pelo menos uma vez contra um banco real antes de
 confiar na proteção que ele afirma provar. Um teste nunca executado pode
 esconder tanto um bug na migration quanto um bug no próprio teste.
+
+## 2026-09-24 (cont.) — Teste de RLS reescrito para usar Admin API; bug de connection string do pooler
+
+A validação anterior (mesma data, entrada acima) foi feita contra um
+Postgres vanilla local — bom o bastante para achar o bug de ordenação
+entre migrations, mas escondeu dois problemas que só apareceram ao rodar
+contra um projeto Supabase real de verdade (`prisma-bordados`):
+
+1. **`auth.users` real recusa insert direto**: `permission denied for
+table users` — a tabela é gerenciada só pelo GoTrue/Auth do Supabase,
+   nem o dono do banco escreve nela à mão (diferente do meu Postgres
+   vanilla local, onde eu mesmo criei a tabela e dei `grant insert`).
+   `rls-isolation.integration.test.ts` foi reescrito para criar os
+   usuários de teste via `supabaseAdmin.auth.admin.createUser` (Admin
+   API, mesmo padrão de `src/db/seed.ts`), e apagá-los no `afterAll` via
+   `auth.admin.deleteUser`. O teste agora é gated por 3 variáveis
+   (`DATABASE_URL` + `NEXT_PUBLIC_SUPABASE_URL` +
+   `SUPABASE_SERVICE_ROLE_KEY`), não só `DATABASE_URL`.
+2. **Formato do username no pooler**: `postgresql://base_erp_app:senha@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`
+   falha com `FATAL: no tenant identifier provided (external_id or
+sni_hostname required)`. O pooler (Supavisor) do Supabase precisa do
+   project ref como sufixo do username:
+   `base_erp_app.<project-ref>`. `.env.example` e o README ("Configurando
+   o banco") foram corrigidos com essa observação — o exemplo anterior
+   (copiado de memória, nunca validado contra um Supabase real) estava
+   errado.
+
+Com as duas correções, validei de ponta a ponta contra o projeto Supabase
+real do Prisma (aplicação das migrations, definição de senha do papel de
+app, conexão via pooler, e o teste de isolamento passando com usuários
+reais criados/apagados via Admin API) — ver `prisma/docs/decisoes.md`
+para o detalhe da execução.
+
+**Lição reforçada**: "testado contra um Postgres" não é o mesmo que
+"testado contra Supabase" — `auth.users` real tem permissões e o pooler
+tem um formato de conexão que só aparecem com um projeto de verdade.

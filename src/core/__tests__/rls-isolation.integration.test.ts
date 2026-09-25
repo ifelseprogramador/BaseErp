@@ -7,28 +7,47 @@
  * (pacote `postgres`, sem passar por `withOrg()`/Drizzle), exatamente
  * como pedido: a prova precisa vir do banco, não da aplicação.
  *
- * Como rodar de verdade:
- *   1. Suba um Postgres (`docker run -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:17`
- *      ou um projeto Supabase local via `supabase start`).
- *   2. Aplique as migrations: `DATABASE_URL=... DATABASE_MIGRATION_URL=...
- *      npm run db:migrate` (a migration `0000_app_role.sql` cria o papel
- *      `base_erp_app` usado aqui).
- *   3. Rode com `DATABASE_URL` apontando para uma conexão como
- *      `base_erp_app` (sem bypassrls): `DATABASE_URL=postgresql://base_erp_app:...@localhost:5432/postgres
- *      npm run test -- rls-isolation`.
+ * Usuários de teste são criados via Admin API do Supabase
+ * (`supabaseAdmin.auth.admin.createUser`), NÃO por insert direto em
+ * `auth.users` — um Supabase real recusa esse insert (`permission denied
+ * for table users`; a tabela é gerenciada só pelo GoTrue/Auth, mesmo o
+ * dono do banco não escreve nela à mão). Essa era a versão anterior deste
+ * teste, validada só contra um Postgres vanilla local (sem `auth.users`
+ * de verdade) — passava lá e falhava na primeira vez que rodou contra um
+ * projeto Supabase real. Descoberto e corrigido em 2026-09-24, ver
+ * docs/decisoes.md.
  *
- * Sem `DATABASE_URL` no ambiente (ex.: rodando `npm run check` neste
- * template sem um Postgres real por perto), o teste é pulado — nunca
+ * Como rodar de verdade (contra um projeto Supabase real, local via
+ * `supabase start` ou hospedado):
+ *   1. Aplique as migrations: `npm run db:migrate` (usa
+ *      `DATABASE_MIGRATION_URL`/`DATABASE_URL` de `.env.local`; a
+ *      migration `0000_app_role.sql` cria o papel `base_erp_app`).
+ *   2. Rode com as 3 env vars abaixo apontando para esse mesmo projeto:
+ *      `DATABASE_URL` = conexão como `base_erp_app` (papel de app, sem
+ *      bypassrls — ver README "Configurando o banco" para o formato
+ *      exato da connection string via pooler), `NEXT_PUBLIC_SUPABASE_URL`
+ *      e `SUPABASE_SERVICE_ROLE_KEY` = os mesmos do projeto.
+ *      `DATABASE_URL=... NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx vitest run rls-isolation`
+ *
+ * Sem as 3 variáveis no ambiente (ex.: rodando `npm run check` neste
+ * template sem um Supabase real por perto), o teste é pulado — nunca
  * falha por falta de infraestrutura, mas também nunca finge ter passado
  * (ver `describe.skipIf` abaixo, que deixa isso visível no relatório).
+ *
+ * Cria e apaga usuários reais no projeto Supabase apontado — nunca rode
+ * isto contra um projeto de produção com dados de clientes de verdade.
  */
-import { randomUUID } from "node:crypto";
 import postgres from "postgres";
+import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => {
+const canRun = Boolean(DATABASE_URL && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+
+describe.skipIf(!canRun)("isolamento por RLS entre organizações", () => {
   let sql: postgres.Sql;
   let orgAId: string;
   let orgBId: string;
@@ -38,24 +57,33 @@ describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => 
 
   beforeAll(async () => {
     sql = postgres(DATABASE_URL!, { prepare: false });
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Usuários fictícios em auth.users — só os campos que a FK exige.
+    const suffix = Date.now();
+
     // `adminUserId` é um usuário à parte, só para o setup via bootstrap de
     // admin (ver abaixo) — CRÍTICO: não pode ser o mesmo usuário usado nas
     // asserções de isolamento. Um platform admin enxerga todas as
     // organizações por desenho (`is_current_user_platform_admin()` na
     // policy), então testar isolamento logado como admin não prova nada;
-    // a primeira versão deste teste tinha exatamente esse bug (promovia
-    // `userA` a admin para criar as orgs, e depois testava isolamento com
-    // esse mesmo `userA` — sempre "passava" mesmo que a RLS estivesse
-    // quebrada, porque admin vê tudo mesmo). `userAId`/`userBId` abaixo
+    // uma versão anterior deste teste promovia `userA` a admin para criar
+    // as orgs, e depois testava isolamento com esse mesmo `userA` —
+    // sempre "passava" mesmo que a RLS estivesse quebrada, porque admin
+    // vê tudo mesmo (ver docs/decisoes.md). `userAId`/`userBId` abaixo
     // nunca entram em `platform_admins`.
-    adminUserId = randomUUID();
-    userAId = randomUUID();
-    userBId = randomUUID();
-    await sql`insert into auth.users (id, email) values (${adminUserId}, ${"admin@example.com"})`;
-    await sql`insert into auth.users (id, email) values (${userAId}, ${"a@example.com"})`;
-    await sql`insert into auth.users (id, email) values (${userBId}, ${"b@example.com"})`;
+    const createUser = async (email: string) => {
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: "Teste123!Descartavel",
+        email_confirm: true,
+      });
+      if (error) throw error;
+      return data.user!.id;
+    };
+
+    adminUserId = await createUser(`rls-test-admin-${suffix}@example.com`);
+    userAId = await createUser(`rls-test-a-${suffix}@example.com`);
+    userBId = await createUser(`rls-test-b-${suffix}@example.com`);
 
     // organizations/memberships exigem contexto de admin para inserir
     // (ver migrations-custom/0001_rls_policies.sql) — o `adminUserId` se
@@ -68,9 +96,9 @@ describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => 
     await sql.begin(async (tx) => {
       await tx`select set_config('app.current_user_id', ${adminUserId}, true)`;
       const [orgA] =
-        await tx`insert into organizations (name) values (${"Organização A"}) returning id`;
+        await tx`insert into organizations (name) values (${"RLS Test Org A " + suffix}) returning id`;
       const [orgB] =
-        await tx`insert into organizations (name) values (${"Organização B"}) returning id`;
+        await tx`insert into organizations (name) values (${"RLS Test Org B " + suffix}) returning id`;
       orgAId = orgA.id;
       orgBId = orgB.id;
       await tx`insert into memberships (user_id, organization_id, role) values (${userAId}, ${orgAId}, 'owner')`;
@@ -79,16 +107,20 @@ describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => 
   });
 
   afterAll(async () => {
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    await sql`delete from memberships where organization_id in (${orgAId}, ${orgBId})`;
     await sql`delete from organizations where id in (${orgAId}, ${orgBId})`;
     await sql`delete from platform_admins where user_id = ${adminUserId}`;
-    await sql`delete from auth.users where id in (${adminUserId}, ${userAId}, ${userBId})`;
     await sql.end();
+    await Promise.all(
+      [adminUserId, userAId, userBId].map((id) => supabaseAdmin.auth.admin.deleteUser(id)),
+    );
   });
 
   it("usuário da organização A não enxerga a organização B", async () => {
     const rows = await sql.begin(async (tx) => {
       await tx`select set_config('app.current_user_id', ${userAId}, true)`;
-      return tx`select id, name from organizations order by name`;
+      return tx`select id, name from organizations where id in (${orgAId}, ${orgBId}) order by name`;
     });
 
     expect(rows.map((r) => r.id)).toContain(orgAId);
@@ -98,7 +130,7 @@ describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => 
   it("usuário da organização A não enxerga memberships da organização B", async () => {
     const rows = await sql.begin(async (tx) => {
       await tx`select set_config('app.current_user_id', ${userAId}, true)`;
-      return tx`select organization_id from memberships`;
+      return tx`select organization_id from memberships where organization_id in (${orgAId}, ${orgBId})`;
     });
 
     expect(rows.every((r) => r.organization_id === orgAId)).toBe(true);
