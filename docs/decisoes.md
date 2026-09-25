@@ -240,3 +240,26 @@ para o detalhe da execução.
 **Lição reforçada**: "testado contra um Postgres" não é o mesmo que
 "testado contra Supabase" — `auth.users` real tem permissões e o pooler
 tem um formato de conexão que só aparecem com um projeto de verdade.
+
+## 2026-09-25 — Três peças universais adicionadas, descobertas testando o Prisma no navegador
+
+Testar o Prisma de verdade no navegador (não só os testes automatizados)
+achou peças que faltavam no BaseERP e que qualquer vertical futuro vai
+precisar — trazidas pra cá seguindo a regra de manutenção deste template:
+
+- **`components/action-link.tsx`** — padrão de todo link de linha de
+  tabela (cor primária sem sublinhado fixo, ícone que desliza no
+  hover/foco dizendo o que o clique faz), portado do mecano-erp. Usar em
+  vez de `<Link className="hover:underline">` em qualquer lista nova.
+- **`components/list-filter-bar.tsx`** — barra de filtro (um select por
+  dimensão filtrável) + ordenação, também do mecano-erp, 100% genérica
+  (lê/escreve searchParams da própria página). Convenção de uso: cada
+  módulo exporta `<MODULO>_SORT_OPTIONS` do seu `queries.ts` (ver
+  `src/modules/README.md`).
+- **`components/stale-service-worker-cleanup.tsx`** — corrige um
+  problema real de dev: um service worker registrado por outro projeto
+  (ex. mecano-erp, que tem um de verdade) na mesma porta local fica
+  associado à origem do navegador e serve conteúdo em cache do projeto
+  errado. Este template ainda não tem service worker próprio — plugado
+  no `layout.tsx` raiz, desregistra qualquer um encontrado ao montar.
+  Remover/ajustar quando este projeto ganhar seu próprio PWA/offline.
