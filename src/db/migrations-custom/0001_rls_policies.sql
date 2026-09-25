@@ -55,12 +55,44 @@ $$;
 grant execute on function public.current_app_user_id() to authenticated;
 grant execute on function public.current_org_ids() to authenticated;
 
+-- Precisa vir ANTES de qualquer policy/helper que a chame nesta mesma
+-- migration (organizations/memberships abaixo, e `apply_org_rls()`) —
+-- movida para cá de 0002_platform_admin_rls.sql, que a usava antes de
+-- defini-la (bug de ordenação: a tabela `platform_admins` já existe neste
+-- ponto, criada pelas migrations do drizzle-kit que rodam antes de toda
+-- migration custom, então não há problema em definir a função aqui).
+-- SECURITY DEFINER: precisa poder ler `platform_admins` ignorando a
+-- própria RLS dessa tabela (senão vira recursão/círculo — a policy de
+-- toda outra tabela chama esta função, que checaria a RLS de
+-- platform_admins, que checaria esta função...).
+--
+-- `current_setting('app.is_system', true) = 'true'` cobre o cron de
+-- backup (`api/cron/backup/route.ts`, `core/db.ts#runWithSystemContext`):
+-- ele roda sem sessão de usuário nenhuma (protegido por `CRON_SECRET` na
+-- camada HTTP, não por login), então precisa do mesmo acesso "enxerga
+-- tudo" que um admin tem — nunca definido por código que não tenha
+-- primeiro validado o `CRON_SECRET`.
+create or replace function public.is_current_user_platform_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(current_setting('app.is_system', true), '') = 'true'
+    or exists (
+      select 1 from platform_admins where user_id = public.current_app_user_id()
+    )
+$$;
+
+grant execute on function public.is_current_user_platform_admin() to authenticated;
+
 -- Helper para não reescrever as mesmas 4 policies em toda migration de
 -- módulo novo: habilita RLS numa tabela com `organization_id` e cria as
 -- policies de select/insert/update/delete restritas a
--- `current_org_ids()` OU a um platform admin agindo (ver
--- 0002_platform_admin_rls.sql para `is_current_user_platform_admin()`) —
--- o admin precisa enxergar/editar qualquer organização a partir da MESMA
+-- `current_org_ids()` OU a um platform admin agindo (`is_current_user_platform_admin()`,
+-- definida acima) — o admin precisa enxergar/editar qualquer organização a partir da MESMA
 -- conexão RLS-ativa, não há um segundo papel de banco "sem RLS" aqui.
 -- Uso (numa migration custom nova):
 --   select public.apply_org_rls('nome_da_tabela');

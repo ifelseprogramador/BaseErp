@@ -10,32 +10,9 @@ alter table "platform_admins"
   add constraint "platform_admins_user_id_auth_users_id_fk"
   foreign key ("user_id") references auth.users(id) on delete cascade;
 
--- SECURITY DEFINER: precisa poder ler `platform_admins` ignorando a
--- própria RLS dessa tabela (senão vira recursão/círculo — a policy de
--- toda outra tabela chama esta função, que checaria a RLS de
--- platform_admins, que checaria esta função...).
---
--- `current_setting('app.is_system', true) = 'true'` cobre o cron de
--- backup (`api/cron/backup/route.ts`, `core/db.ts#runWithSystemContext`):
--- ele roda sem sessão de usuário nenhuma (protegido por `CRON_SECRET` na
--- camada HTTP, não por login), então precisa do mesmo acesso "enxerga
--- tudo" que um admin tem — nunca definido por código que não tenha
--- primeiro validado o `CRON_SECRET`.
-create or replace function public.is_current_user_platform_admin()
-returns boolean
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select
-    coalesce(current_setting('app.is_system', true), '') = 'true'
-    or exists (
-      select 1 from platform_admins where user_id = public.current_app_user_id()
-    )
-$$;
-
-grant execute on function public.is_current_user_platform_admin() to authenticated;
+-- `is_current_user_platform_admin()` foi movida para 0001_rls_policies.sql
+-- (definida antes de ser usada pelas policies de organizations/memberships
+-- daquele arquivo — ver o comentário lá para o porquê).
 
 -- Só um admin já confirmado pode ler/editar a lista de admins...
 create policy "platform_admins_admin_rw" on "platform_admins"

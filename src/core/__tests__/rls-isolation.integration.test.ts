@@ -32,6 +32,7 @@ describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => 
   let sql: postgres.Sql;
   let orgAId: string;
   let orgBId: string;
+  let adminUserId: string;
   let userAId: string;
   let userBId: string;
 
@@ -39,21 +40,33 @@ describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => 
     sql = postgres(DATABASE_URL!, { prepare: false });
 
     // Usuários fictícios em auth.users — só os campos que a FK exige.
+    // `adminUserId` é um usuário à parte, só para o setup via bootstrap de
+    // admin (ver abaixo) — CRÍTICO: não pode ser o mesmo usuário usado nas
+    // asserções de isolamento. Um platform admin enxerga todas as
+    // organizações por desenho (`is_current_user_platform_admin()` na
+    // policy), então testar isolamento logado como admin não prova nada;
+    // a primeira versão deste teste tinha exatamente esse bug (promovia
+    // `userA` a admin para criar as orgs, e depois testava isolamento com
+    // esse mesmo `userA` — sempre "passava" mesmo que a RLS estivesse
+    // quebrada, porque admin vê tudo mesmo). `userAId`/`userBId` abaixo
+    // nunca entram em `platform_admins`.
+    adminUserId = randomUUID();
     userAId = randomUUID();
     userBId = randomUUID();
+    await sql`insert into auth.users (id, email) values (${adminUserId}, ${"admin@example.com"})`;
     await sql`insert into auth.users (id, email) values (${userAId}, ${"a@example.com"})`;
     await sql`insert into auth.users (id, email) values (${userBId}, ${"b@example.com"})`;
 
     // organizations/memberships exigem contexto de admin para inserir
-    // (ver migrations-custom/0001_rls_policies.sql) — o próprio teste se
+    // (ver migrations-custom/0001_rls_policies.sql) — o `adminUserId` se
     // auto-promove a admin via a policy de bootstrap (tabela vazia).
     await sql.begin(async (tx) => {
-      await tx`select set_config('app.current_user_id', ${userAId}, true)`;
-      await tx`insert into platform_admins (user_id) values (${userAId}) on conflict do nothing`;
+      await tx`select set_config('app.current_user_id', ${adminUserId}, true)`;
+      await tx`insert into platform_admins (user_id) values (${adminUserId}) on conflict do nothing`;
     });
 
     await sql.begin(async (tx) => {
-      await tx`select set_config('app.current_user_id', ${userAId}, true)`;
+      await tx`select set_config('app.current_user_id', ${adminUserId}, true)`;
       const [orgA] =
         await tx`insert into organizations (name) values (${"Organização A"}) returning id`;
       const [orgB] =
@@ -67,8 +80,8 @@ describe.skipIf(!DATABASE_URL)("isolamento por RLS entre organizações", () => 
 
   afterAll(async () => {
     await sql`delete from organizations where id in (${orgAId}, ${orgBId})`;
-    await sql`delete from platform_admins where user_id = ${userAId}`;
-    await sql`delete from auth.users where id in (${userAId}, ${userBId})`;
+    await sql`delete from platform_admins where user_id = ${adminUserId}`;
+    await sql`delete from auth.users where id in (${adminUserId}, ${userAId}, ${userBId})`;
     await sql.end();
   });
 

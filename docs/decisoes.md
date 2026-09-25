@@ -155,3 +155,52 @@ direto em `prisma/src/modules/clientes/` (ver a decisão espelhada em
 `prisma/docs/decisoes.md`, "Onde o módulo `clientes` foi criado"). Fica
 como candidato a promoção para este template quando um segundo vertical
 precisar de cadastro de cliente.
+
+## 2026-09-24 — RLS validada de verdade contra Postgres real; bug de ordenação corrigido
+
+Até aqui os testes de isolamento por RLS existiam só como código gated por
+`DATABASE_URL` (ver `src/core/__tests__/rls-isolation.integration.test.ts`),
+nunca executados de fato — os ambientes de implementação anteriores não
+tinham Postgres/Docker disponível. Hoje isso foi resolvido montando um
+Postgres 16 local sem privilégio de root (baixando o `.deb` oficial do
+apt.postgresql.org com `apt-get download` e extraindo com `dpkg-deb -x`,
+sem instalar no sistema — `initdb`/`pg_ctl` funcionam normalmente a partir
+dos binários extraídos) e simulando o mínimo de Supabase que as migrations
+custom esperam (`schema auth` com uma tabela `users`, papéis
+`authenticated`/`anon`/`service_role`).
+
+Isso encontrou e corrigiu dois problemas reais que nenhuma leitura de
+código pegaria:
+
+1. **Bug de ordenação entre migrations**: `0001_rls_policies.sql` criava
+   as policies de `organizations`/`memberships` chamando
+   `is_current_user_platform_admin()` diretamente, mas essa função só era
+   definida em `0002_platform_admin_rls.sql` (que roda depois). A migration
+   falhava com `function ... does not exist` ao aplicar do zero. Corrigido
+   movendo a definição da função para `0001`, antes do primeiro uso —
+   `platform_admins` (a tabela que a função consulta) já existe nesse ponto
+   porque as migrations do drizzle-kit rodam antes de qualquer migration
+   custom, então não há dependência circular real, só uma ordem errada
+   dentro do próprio arquivo custom.
+2. **Teste de isolamento com premissa quebrada**: a primeira versão do
+   teste promovia o próprio usuário testado (`userA`) a `platform_admin`
+   para poder contornar a policy de bootstrap e criar as organizações de
+   teste — mas um platform admin enxerga todas as organizações por
+   desenho (`... or is_current_user_platform_admin()` em toda policy).
+   Rodado de verdade, o teste falhava (`userA` via a organização B) porque
+   estava, sem querer, testando o caminho de admin, não o de isolamento
+   entre tenants comuns. Corrigido introduzindo um `adminUserId` dedicado
+   só ao setup, nunca usado nas asserções — `userA`/`userB` continuam
+   sendo membros comuns, nunca admins.
+
+Com as duas correções, os 3 testes de `rls-isolation.integration.test.ts`
+passam de verdade contra Postgres real, e um smoke test manual adicional
+(fora deste template, feito no Prisma, que já tem módulos de negócio)
+confirmou o mesmo isolamento em `clientes`, `pedidos` e `pedido_itens`
+(RLS via join) — ver `prisma/docs/decisoes.md`.
+
+**Lição para quem mantiver este template**: escrever um teste de
+integração gated por `DATABASE_URL` não é suficiente por si só — ele
+precisa ser executado pelo menos uma vez contra um banco real antes de
+confiar na proteção que ele afirma provar. Um teste nunca executado pode
+esconder tanto um bug na migration quanto um bug no próprio teste.
