@@ -74,7 +74,7 @@ export default async function NotificationDetailPage({
               {notification.readers.map((reader) => (
                 <li key={reader.userId} className="flex items-center justify-between py-2 text-sm">
                   <div>
-                    <p>{reader.email ?? reader.userId}</p>
+                    <p>{reader.name}</p>
                     <p className="text-muted-foreground text-xs">{reader.organizationName}</p>
                   </div>
                   <span className="text-muted-foreground text-xs">{formatDate(reader.readAt)}</span>

@@ -10,6 +10,7 @@ import { ImpersonateButton } from "@/core/admin/components/impersonate-button";
 import { BillingForm } from "@/core/admin/components/billing-form";
 import { ModuleToggleList } from "@/core/admin/components/module-toggle-list";
 import { HardDeleteForm } from "@/core/admin/components/hard-delete-form";
+import { ResetMemberPasswordButton } from "@/core/admin/components/reset-member-password-button";
 import { AuditLogCard } from "@/core/admin/components/audit-log-card";
 import { LiveSupportCard } from "@/core/admin/components/live-support-card";
 import { getAllModules } from "@/core/registry";
@@ -107,11 +108,22 @@ export default async function AdminOrganizationDetailPage({
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {members.map((m) => (
-                <li key={m.id} className="flex items-center justify-between">
-                  <span>{m.email ?? m.userId}</span>
-                  <div className="flex gap-2">
+                <li key={m.id} className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate">{m.name}</p>
+                    <p className="text-muted-foreground truncate font-mono text-xs">
+                      {m.email && m.email !== m.name ? `${m.email} · ` : ""}
+                      {m.userId}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Badge variant="outline">{m.role === "owner" ? "Dono" : "Equipe"}</Badge>
                     {!m.active && <Badge variant="destructive">Bloqueado</Badge>}
+                    <ResetMemberPasswordButton
+                      organizationId={org.id}
+                      userId={m.userId}
+                      label={m.name}
+                    />
                   </div>
                 </li>
               ))}

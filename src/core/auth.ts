@@ -1,6 +1,7 @@
 import "server-only";
 import { headers, cookies } from "next/headers";
 import { eq } from "drizzle-orm";
+import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/core/supabase/server";
 import { runWithUserContext, type Database } from "@/core/db";
 import { memberships, organizations } from "@/db/schema";
@@ -44,6 +45,21 @@ export async function getSession() {
 }
 
 /**
+ * `true` quando a pessoa precisa trocar a senha antes de acessar
+ * qualquer outra tela — setado em `app_metadata` (só editável via Admin
+ * API/service role, nunca pelo próprio usuário) por
+ * `core/admin/actions.ts#createOrganization` (usuário novo, senha
+ * inicial) e `#resetMemberPassword` (reset feito pelo dono da
+ * plataforma). Zerado por `core/profile/actions.ts#setNewPassword`
+ * depois que a pessoa define uma senha própria. Ver
+ * `app/(auth)/trocar-senha-obrigatoria/` e o gate nos layouts de
+ * `(app)`/`(admin)`.
+ */
+export function mustChangePassword(user: User): boolean {
+  return user.app_metadata?.must_change_password === true;
+}
+
+/**
  * Se o cookie de modo suporte estiver presente E o usuário da sessão
  * atual for mesmo um platform admin agora (reconfirmado a cada chamada —
  * o cookie sozinho nunca é suficiente), devolve o id da organização que
@@ -73,6 +89,8 @@ interface ActiveOrgResult {
   role: "owner" | "staff";
   impersonating: boolean;
   organizationStatus: "active" | "blocked";
+  primaryColor: string | null;
+  logoUrl: string | null;
 }
 
 /**
@@ -101,7 +119,13 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
   return runWithUserContext(user.id, async (tx) => {
     if (impersonatedOrgId) {
       const [org] = await tx
-        .select({ id: organizations.id, name: organizations.name, status: organizations.status })
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+          status: organizations.status,
+          primaryColor: organizations.primaryColor,
+          logoUrl: organizations.logoUrl,
+        })
         .from(organizations)
         .where(eq(organizations.id, impersonatedOrgId))
         .limit(1);
@@ -115,6 +139,8 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
           role: "owner",
           impersonating: true,
           organizationStatus: org.status,
+          primaryColor: org.primaryColor,
+          logoUrl: org.logoUrl,
         };
       }
       // Organização foi apagada durante o modo suporte — cai para o
@@ -128,6 +154,8 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
         membershipActive: memberships.active,
         organizationName: organizations.name,
         organizationStatus: organizations.status,
+        primaryColor: organizations.primaryColor,
+        logoUrl: organizations.logoUrl,
       })
       .from(memberships)
       .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
@@ -150,6 +178,8 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
       role: membership.role,
       impersonating: false,
       organizationStatus: "active", // já teria lançado acima se bloqueada
+      primaryColor: membership.primaryColor,
+      logoUrl: membership.logoUrl,
     };
   });
 }

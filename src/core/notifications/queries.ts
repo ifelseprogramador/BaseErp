@@ -1,7 +1,8 @@
 import "server-only";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { withOrg } from "@/core/auth";
 import { requireAdmin } from "@/core/admin-auth";
+import { getUserDisplayInfoByIds } from "@/core/user-lookup";
 import { notificationReads, notifications } from "@/db/schema/notifications";
 import { organizations } from "@/db/schema/tenancy";
 
@@ -106,22 +107,15 @@ export async function getNotificationForAdmin(notificationId: string) {
       .where(eq(notificationReads.notificationId, notificationId))
       .orderBy(desc(notificationReads.readAt));
 
-    // auth.users não é modelado pelo Drizzle — mesmo padrão de
-    // core/admin/queries.ts#getOrganizationForAdmin (SQL bruto, mesma
-    // conexão/transação já enxerga o schema `auth`).
-    const userIds = readerRows.map((r) => r.userId);
-    const users =
-      userIds.length > 0
-        ? await db.execute<{ id: string; email: string | null }>(
-            sql`select id, email from auth.users where id in (${sql.join(
-              userIds.map((id) => sql`${id}`),
-              sql`, `,
-            )})`,
-          )
-        : [];
-    const emailById = new Map(Array.from(users).map((u) => [u.id, u.email]));
+    const displayInfoById = await getUserDisplayInfoByIds(
+      db,
+      readerRows.map((r) => r.userId),
+    );
 
-    const readers = readerRows.map((r) => ({ ...r, email: emailById.get(r.userId) ?? null }));
+    const readers = readerRows.map((r) => ({
+      ...r,
+      name: displayInfoById.get(r.userId)?.name ?? r.userId,
+    }));
 
     return { ...notification, readers };
   });

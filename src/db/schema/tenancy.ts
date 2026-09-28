@@ -51,6 +51,15 @@ export const organizations = pgTable("organizations", {
    */
   businessType: text("business_type"),
 
+  // Branding da organização (não do dono da plataforma) — aplicado no
+  // shell do app para toda a equipe daquela organização. Só quem tem
+  // `role === "owner"` edita (checado em `core/profile/actions.ts`, não
+  // em RLS separada). `primaryColor` é hex (ex.: "#2563eb"), sobrescreve
+  // `--primary` em `globals.css`; `logoUrl` aponta para um objeto no
+  // bucket público `branding` do Supabase Storage.
+  primaryColor: text("primary_color"),
+  logoUrl: text("logo_url"),
+
   // Controle de acesso pelo dono da plataforma (área /admin). `status`
   // é o portão de acesso de verdade (checado em core/auth.ts#getActiveOrg);
   // `billingStatus`/`nextDueDate`/`billingNotes` são só informativos — o

@@ -53,8 +53,26 @@ export function getAllModules(): ModuleDefinition[] {
   return [...MODULES].sort((a, b) => a.order - b.order);
 }
 
+/**
+ * `upsert` por `slug`, não `push` puro: em dev, o Fast Refresh do
+ * Turbopack pode reavaliar `core/load-modules.ts` (por causa de um edit
+ * em qualquer arquivo que ele importa, direta ou transitivamente) sem
+ * reiniciar o processo Node — cada `modules/<modulo>/module.ts` roda de
+ * novo, e um `push` puro empilharia o mesmo módulo várias vezes no
+ * `MODULES` module-level (sintoma: "Encountered two children with the
+ * same key" no `sidebar-nav.tsx`, chave = `slug`). `push` puro é seguro
+ * num processo novo (produção), mas não sobrevive a HMR — por isso o
+ * upsert aqui, não só no consumidor. Achado e corrigido no Prisma
+ * (vertical nascido deste template), replicado aqui — ver
+ * docs/decisoes.md.
+ */
 export function registerModule(definition: ModuleDefinition) {
-  MODULES.push(definition);
+  const index = MODULES.findIndex((m) => m.slug === definition.slug);
+  if (index === -1) {
+    MODULES.push(definition);
+  } else {
+    MODULES[index] = definition;
+  }
 }
 
 /** Só para testes: limpa o registro entre casos (o array é module-level,

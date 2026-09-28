@@ -263,3 +263,176 @@ precisar — trazidas pra cá seguindo a regra de manutenção deste template:
   errado. Este template ainda não tem service worker próprio — plugado
   no `layout.tsx` raiz, desregistra qualquer um encontrado ao montar.
   Remover/ajustar quando este projeto ganhar seu próprio PWA/offline.
+
+## 2026-09-25 — `registerModule` vira upsert por `slug` (bug de HMR)
+
+Achado no Prisma (vertical nascido deste template), enquanto se
+trabalhava no módulo `clientes` (feature de LGPD): erro do React em dev
+— "Encountered two children with the same key, `clientes`" no
+`sidebar-nav.tsx`. Causa: `registerModule` (`core/registry.ts`) fazia só
+`MODULES.push(definition)` num array module-level. Em dev, o Fast Refresh
+do Turbopack pode reavaliar `core/load-modules.ts` (por causa de um edit
+em qualquer arquivo que ele importa, direto ou transitivo) sem reiniciar
+o processo Node — cada `modules/<modulo>/module.ts` roda de novo, e um
+`push` puro empilha o mesmo módulo de novo a cada reavaliação, sem
+limite, pelo tempo de vida do processo `next dev`.
+
+Não quebra produção (processo novo por deploy, import único), só dev —
+mas é fragilidade real: qualquer sessão de trabalho editando
+`modules/*/module.ts` (ou algo que ele importe) acumula duplicatas.
+Corrigido trocando `push` por um upsert (`findIndex` por `slug`,
+substitui se já existir). Replicado aqui pela regra de manutenção — ver
+`prisma/docs/decisoes.md`, mesma data.
+
+## 2026-09-28 — Troca de senha obrigatória + módulo Perfil (nome, tema, branding da organização)
+
+Peça pedida pelo dono da plataforma: quando ele cria uma organização em
+`/admin` com um e-mail e senha inicial, quem entra com essa senha precisa
+ser obrigado a trocá-la antes de acessar qualquer outra tela; se
+esquecer a senha depois e não conseguir recuperar sozinha, ele (dono da
+plataforma) precisa poder resetar sem apagar nada que a pessoa já tinha
+cadastrado; e cada pessoa ganha um módulo Perfil (nome de exibição, tema
+claro/escuro) — quem é `role === "owner"` da própria organização também
+configura ali a cor primária e o logo que aparecem pra toda a equipe
+dela (branding do cliente que usa o sistema, não do dono da plataforma).
+
+Decisões de onde guardar cada dado (nenhuma tabela nova de "usuários" —
+mantém o padrão já existente de não modelar `auth.users` no Drizzle):
+
+- **`must_change_password`** vai em `app_metadata` do usuário Supabase —
+  só editável via Admin API (service role), nunca pelo próprio usuário
+  através do client SDK (`user_metadata` seria self-editável e não
+  serviria pra um portão de segurança). Setado por
+  `core/admin/actions.ts#createOrganization` (usuário novo, senha
+  inicial) e `#resetMemberPassword` (reset pelo dono da plataforma — ver
+  abaixo), zerado por `core/profile/actions.ts#setNewPassword` depois
+  que a pessoa define senha própria.
+- **`display_name`** vai em `user_metadata` — a própria pessoa edita via
+  `supabase.auth.updateUser({ data: { display_name } })`.
+- **Tema claro/escuro**: resolvido só no navegador via `next-themes`
+  (`components/theme-provider.tsx`, plugado no `layout.tsx` raiz) — as
+  variáveis CSS pra `.dark` já existiam em `globals.css` desde sempre,
+  mas nenhum `ThemeProvider` estava plugado em lugar nenhum (confirmado
+  também no mecano-erp e no prisma — nenhum dos três tinha dark mode
+  funcional). Não sincronizado em `user_metadata`: seria
+  over-engineering pra uma preferência de navegador, `next-themes`
+  sozinho já resolve sem flash (FOUC).
+- **`primaryColor`/`logoUrl`** são colunas novas em `organizations`
+  (nullable, mesmo padrão de `businessType`/`billingNotes`) — a tabela
+  já tem RLS (`apply_org_rls`), então é só migration comum do
+  drizzle-kit, sem SQL custom novo. Só quem tem `role === "owner"` edita
+  — checado em `core/profile/actions.ts#updateOrganizationBranding`, não
+  em RLS separada (mesmo padrão de "permissão checada na action" do
+  resto de `core/admin`).
+- **Upload do logo**: primeiro uso de Supabase Storage neste projeto
+  (nenhum dos três usava até agora). Bucket público `branding`, criado
+  de forma idempotente pela própria action
+  (`storage.createBucket(..., { public: true })`, ignorando erro de "já
+  existe" — sem passo manual de setup no README). Upload feito com o
+  client admin depois de confirmar `role === "owner"` no código, sem RLS
+  de Storage separada.
+- **Onde barrar quem precisa trocar senha**: nos layouts
+  (`app/(app)/layout.tsx` e `app/(admin)/admin/layout.tsx`), não no
+  `proxy.ts` — ambos chamam `getSession()` + `core/auth.ts#mustChangePassword`
+  antes de `getActiveOrg()`/`requireAdmin()` e redirecionam para
+  `/trocar-senha-obrigatoria` (reaproveita o layout de `(auth)/`, que não
+  tem lógica de "esconder de quem já está logado" — seguro de reusar).
+- **Perfil não é um módulo de `src/modules/`**: o contrato de
+  `src/modules/README.md` é para módulos de negócio pluggáveis por
+  organização (toggle em `organization_module_settings`); Perfil é
+  sempre-ligado. Fica em `core/profile/`, mesmo padrão de
+  `core/live-support`/`core/notifications`/`core/admin`.
+- **Reset de senha pelo dono da plataforma**
+  (`core/admin/actions.ts#resetMemberPassword`,
+  `core/admin/components/reset-member-password-button.tsx`): o `prisma`
+  (vertical nascido deste template) já tinha essa peça — construída lá
+  antes de existir aqui, fora da regra de manutenção porque na época não
+  fazia parte de nenhuma entrega core explícita. Trazida agora pra cá
+  (com um ajuste: também marca `must_change_password`, o que o prisma
+  ainda não fazia — corrigido lá também, ver `prisma/docs/decisoes.md`,
+  mesma data). Gera uma senha provisória aleatória
+  (`generateTemporaryPassword()`, alfabeto sem caracteres ambíguos:
+  0/O, 1/l/I), mostrada uma única vez num dialog — nunca fica salva em
+  lugar nenhum além do que o admin copiar/repassar.
+
+**Fora de escopo, por decisão consciente**: não portei o fluxo de
+autoatendimento "Esqueci minha senha" (e-mail) do prisma pra cá — o
+pedido cobria troca obrigatória + reset pelo dono da plataforma, que já
+resolve "usuário esqueceu e não consegue recuperar". Fica como próximo
+passo natural, usando o prisma como referência
+(`app/(auth)/actions.ts#requestPasswordReset`, `/esqueci-senha`,
+`/redefinir-senha`).
+
+## 2026-09-28 (cont.) — `core/user-lookup.ts`: nome de exibição em vez de UID cru em `/admin`
+
+Bug reportado depois da entrega acima: "Pessoas com acesso" e o
+"Histórico" (auditoria) na ficha de uma organização mostravam o UUID cru
+do usuário sempre que o lookup de `email` em `auth.users` não resolvia
+bem o suficiente pra leitura — na prática, sempre que a pessoa não tinha
+e-mail cadastrado de um jeito legível ali. Três lugares faziam a mesma
+consulta SQL bruta contra `auth.users` e o mesmo fallback pro UID
+(`core/admin/queries.ts#getOrganizationForAdmin` duas vezes — membros e
+auditoria — e `core/notifications/queries.ts#getNotificationForAdmin`,
+"quem leu").
+
+Extraído para `core/user-lookup.ts#getUserDisplayInfoByIds` — único
+lugar que lê `auth.users` por uma lista de ids e devolve
+`{ email, name }`, com `name` sendo `display_name` (`user_metadata`,
+`core/profile/`) quando a pessoa já passou por `/perfil`, senão o
+e-mail, senão o próprio UID (nunca fica sem nenhum rótulo). Os três
+lugares acima passaram a usar esse helper em vez de montar a query e o
+fallback na mão — reduz de 3 cópias praticamente idênticas pra 1.
+
+`ResetMemberPasswordButton` também mudou: a prop `email` virou `label`
+(recebe o nome de exibição, não necessariamente um e-mail) — os textos
+do dialog já eram genéricos o bastante pra não precisar mudar.
+
+## 2026-09-28 (cont.) — Branding (cor/logo) nunca persistia: faltava policy de UPDATE pro owner em `organizations`
+
+Bug reportado em produção (testado no prisma): salvar cor/logo em
+`/perfil` mostrava sucesso, mas nada mudava — nem a cor nos botões, nem
+o logo na sidebar. Causa raiz: `organizations` só tinha a policy
+`organizations_admin_write` (RLS ativa, só platform admin —
+0001_rls_policies.sql), então o `UPDATE` da Server Action batia
+sistematicamente em **0 linhas**, sem erro nenhum (RLS bloqueia
+silenciosamente) — e a action não checava `rowCount`/`.returning()`,
+então via aquilo como sucesso.
+
+Corrigido em duas frentes:
+
+1. **`migrations-custom/0005_organizations_owner_branding.sql`** — nova
+   função `current_owner_org_ids()` (como `current_org_ids()`, mas
+   filtrando `role = 'owner'` — a existente não distingue staff de
+   owner) + policy `organizations_owner_update_branding` liberando
+   UPDATE pra quem é owner da própria organização. Como é o MESMO papel
+   de banco que atende admin e owner (não dá pra restringir por coluna
+   só com `GRANT`), um trigger (`restrict_organization_branding_update`)
+   rejeita qualquer mudança fora de `primary_color`/`logo_url`/
+   `updated_at` quando quem edita não é platform admin — sem isso, um
+   owner poderia chamar a API do Supabase direto (fora do Next.js,
+   ignorando a checagem `role !== "owner"` da action) e tentar mudar
+   `status`/cobrança da própria organização.
+2. **`core/profile/actions.ts#updateOrganizationBranding`** — passou a
+   usar `.returning()` e checar se veio alguma linha; se não veio,
+   devolve erro em vez de "sucesso" — rede de segurança pra nunca mais
+   esconder um bloqueio de RLS como se fosse sucesso.
+
+Também trocada a forma de aplicar a cor no app: em vez de `style`
+inline num `<div>` (dependia de como o Tailwind v4 compila
+`@theme inline` — incerto o bastante pra não confiar sem testar contra
+produção), `components/org-branding-style.tsx` injeta um
+`<style>:root{--primary:...}</style>` — aplica no elemento raiz do
+documento de verdade, sem depender de indireção de variável CSS em
+elemento aninhado. Revalida o formato hex de novo antes de interpolar
+(nunca montar CSS bruto a partir de um valor do banco sem checar, mesmo
+que a origem seja validada no input).
+
+Cabeçalho do app também passou a mostrar `user_metadata.display_name`
+(fallback: e-mail) no menu da pessoa, em vez do e-mail cru — pedido
+direto depois de testar em produção.
+
+"Pessoas com acesso" e "Histórico" (auditoria) em `/admin` passaram a
+mostrar nome **e** código (UUID) juntos — o pedido inicial (replicar
+nome amigável) tirou o UUID de vez, mas o dono da plataforma preferiu
+manter os dois visíveis (útil pra achar alguém no dashboard do Supabase
+por exemplo).

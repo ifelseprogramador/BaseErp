@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeftRight, LogOut, Megaphone, ShieldAlert } from "lucide-react";
 import { requireAdmin, NotPlatformAdminError } from "@/core/admin-auth";
+import { getSession, mustChangePassword } from "@/core/auth";
 import { Button } from "@/components/ui/button";
 import { VersionBadge } from "@/components/version-badge";
 import { logout } from "@/app/(auth)/actions";
@@ -8,6 +10,11 @@ import { listPendingUserRequestsForAdmin } from "@/core/live-support/queries";
 import { SupportNotificationBell } from "@/core/admin/components/support-notification-bell";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const user = await getSession();
+  if (user && mustChangePassword(user)) {
+    redirect("/trocar-senha-obrigatoria");
+  }
+
   try {
     await requireAdmin();
   } catch (err) {

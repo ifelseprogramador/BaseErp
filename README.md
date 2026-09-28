@@ -131,3 +131,17 @@ um vertical.
 6. **Mantenha a regra de manutenção**: qualquer correção feita numa peça
    de core/tenancy/RLS/admin enquanto se trabalha no vertical deve ser
    replicada de volta para este template (ver docs/decisoes.md).
+
+**Visão de longo prazo (ainda não implementada — hoje é cópia manual)**:
+todo vertical de negócio novo (ex.: um ERP para mercado, para uma
+oficina, para bordados) deve nascer deste template, nunca do zero — ele
+é a base comum reaproveitada por segmento, especializada só com os
+módulos daquele segmento. O objetivo declarado é que uma atualização no
+BaseERP propague automaticamente para os verticais que nasceram dele
+(hoje é o oposto: cada correção de core/tenancy/RLS/admin precisa ser
+replicada à mão, repositório por repositório — ver a regra acima e o
+histórico de replicações em docs/decisoes.md). Nenhum mecanismo de
+propagação automática existe ainda (candidatos a explorar quando isso
+virar prioridade: submódulo/pacote git compartilhado, um pacote npm
+interno para `core/`, ou tooling de sync) — até lá, a réplica manual
+descrita acima é o processo real.

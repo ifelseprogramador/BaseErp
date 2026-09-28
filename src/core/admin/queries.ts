@@ -1,7 +1,8 @@
 import "server-only";
-import { desc, eq, ilike, sql } from "drizzle-orm";
+import { desc, eq, ilike } from "drizzle-orm";
 import type { Database } from "@/core/db";
 import { getAuditLogForOrg } from "@/core/admin/audit";
+import { getUserDisplayInfoByIds } from "@/core/user-lookup";
 import { memberships, organizationModuleSettings, organizations } from "@/db/schema";
 
 export async function listOrganizationsForAdmin(db: Database, search?: string) {
@@ -53,25 +54,19 @@ export async function getOrganizationForAdmin(db: Database, organizationId: stri
     getAuditLogForOrg(db, organizationId),
   ]);
 
-  // auth.users não é modelado pelo Drizzle (schema gerenciado pelo Supabase
-  // Auth) — lido com SQL bruto, na mesma conexão/transação.
-  const userIds = new Set([...members.map((m) => m.userId), ...audit.map((a) => a.actorUserId)]);
-  const users =
-    userIds.size > 0
-      ? await db.execute<{ id: string; email: string | null }>(
-          sql`select id, email from auth.users where id in (${sql.join(
-            Array.from(userIds).map((id) => sql`${id}`),
-            sql`, `,
-          )})`,
-        )
-      : [];
-
-  const emailById = new Map(Array.from(users).map((u) => [u.id, u.email]));
+  const userIds = [...members.map((m) => m.userId), ...audit.map((a) => a.actorUserId)];
+  const displayInfoById = await getUserDisplayInfoByIds(db, userIds);
 
   return {
     organization: org,
-    members: members.map((m) => ({ ...m, email: emailById.get(m.userId) ?? null })),
+    members: members.map((m) => {
+      const info = displayInfoById.get(m.userId);
+      return { ...m, email: info?.email ?? null, name: info?.name ?? m.userId };
+    }),
     moduleSettings,
-    audit: audit.map((a) => ({ ...a, actorEmail: emailById.get(a.actorUserId) ?? a.actorUserId })),
+    audit: audit.map((a) => ({
+      ...a,
+      actorName: displayInfoById.get(a.actorUserId)?.name ?? a.actorUserId,
+    })),
   };
 }

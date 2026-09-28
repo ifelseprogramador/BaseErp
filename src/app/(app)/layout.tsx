@@ -1,7 +1,11 @@
 import "@/core/load-modules";
-import { LogOut, Building2, Headset } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { LogOut, Building2, Headset, User } from "lucide-react";
 import {
   getActiveOrg,
+  getSession,
+  mustChangePassword,
   withOrg,
   NoActiveOrganizationError,
   OrganizationBlockedError,
@@ -16,10 +20,22 @@ import { listNotificationsForCurrentUser } from "@/core/notifications/queries";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { VersionBadge } from "@/components/version-badge";
+import { OrgBrandingStyle } from "@/components/org-branding-style";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { logout } from "@/app/(auth)/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const user = await getSession();
+  if (user && mustChangePassword(user)) {
+    redirect("/trocar-senha-obrigatoria");
+  }
+
   let org;
   try {
     org = await getActiveOrg();
@@ -41,6 +57,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     throw err;
   }
 
+  const displayName = (user?.user_metadata?.display_name as string | undefined) ?? org.userEmail;
+
   const { withDb } = await withOrg();
   const modules = await withDb((tx) => getEnabledModulesForOrg(tx, org.organizationId));
   const stopImpersonationWithId = stopImpersonation.bind(null, org.organizationId);
@@ -52,6 +70,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen flex-1 flex-col">
+      <OrgBrandingStyle primaryColor={org.primaryColor} />
       {org.impersonating && (
         <div className="flex items-center justify-between bg-amber-500 px-4 py-2 text-sm font-medium text-amber-950 print:hidden">
           <span className="flex items-center gap-2">
@@ -70,8 +89,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex flex-1">
         <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex print:hidden">
           <div className="border-sidebar-border flex items-center gap-2 border-b px-4 py-3.5">
-            <Building2 className="text-sidebar-primary h-5 w-5" />
-            <span className="font-semibold">BaseERP</span>
+            {org.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- URL dinâmica do Supabase Storage, fora do domínio de imagens do Next.
+              <img src={org.logoUrl} alt={org.organizationName} className="h-6 w-auto" />
+            ) : (
+              <>
+                <Building2 className="text-sidebar-primary h-5 w-5" />
+                <span className="font-semibold">BaseERP</span>
+              </>
+            )}
           </div>
           <SidebarNav modules={modules} />
           <div className="border-sidebar-border mt-auto border-t px-2 py-2">
@@ -87,9 +113,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
             <div className="flex items-center gap-3">
               <NotificationBell organizationId={org.organizationId} initialItems={notifications} />
-              <span className="text-muted-foreground hidden text-sm sm:inline">
-                {org.userEmail}
-              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button variant="ghost" size="sm" className="gap-2">
+                      <User className="h-4 w-4" />
+                      <span className="text-muted-foreground hidden sm:inline">{displayName}</span>
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem render={<Link href="/perfil" />}>
+                    <User className="h-4 w-4" />
+                    Perfil
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <form action={logout}>
                 <Button variant="ghost" size="icon" type="submit" aria-label="Sair">
                   <LogOut className="h-4 w-4" />

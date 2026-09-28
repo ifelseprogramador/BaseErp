@@ -38,7 +38,8 @@ const ACTION_LABELS: Record<string, string> = {
 
 interface AuditEntry {
   id: string;
-  actorEmail: string;
+  actorName: string;
+  actorUserId: string;
   action: string;
   metadata: unknown;
   createdAt: Date;
@@ -115,9 +116,14 @@ export function AuditLogCard({
           <ul className="flex max-h-80 flex-col gap-3 overflow-y-auto pr-1 text-sm">
             {entries.map((entry) => (
               <li key={entry.id} className="flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium">{ACTION_LABELS[entry.action] ?? entry.action}</p>
-                  <p className="text-muted-foreground text-xs">{entry.actorEmail}</p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {entry.actorName}
+                    {entry.actorName !== entry.actorUserId && (
+                      <span className="font-mono"> · {entry.actorUserId}</span>
+                    )}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className="text-muted-foreground text-xs">
