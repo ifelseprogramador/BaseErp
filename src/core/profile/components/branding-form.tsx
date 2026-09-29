@@ -22,19 +22,32 @@ const initialState: ActionResult = { ok: false };
  * `globals.css`, um `<input type="color">` só aceita hex). Usado só
  * como valor inicial do seletor quando não há override salvo: sem isso,
  * o seletor mostraria um azul arbitrário no primeiro acesso em vez da
- * cor padrão de verdade do sistema. */
+ * cor padrão de verdade do sistema.
+ *
+ * Normaliza via `<canvas>` (`fillStyle`), não parseando o texto de
+ * `getComputedStyle` na mão: navegadores modernos podem devolver a cor
+ * computada no PRÓPRIO formato usado no CSS (`oklch(...)`), não sempre
+ * `rgb(...)`. Uma regex que assume `rgb(r, g, b)` lê `oklch(L, C, H)`
+ * como se fossem R/G/B e produz uma cor de fantasia — bug real
+ * encontrado em produção (a cor inicial do seletor nunca batia com a
+ * cor de verdade do sistema). `canvas.fillStyle` aceita qualquer
+ * sintaxe de cor CSS válida e sempre devolve de volta em `#rrggbb`,
+ * sem essa ambiguidade. */
 function resolveCssVarAsHex(cssVar: string): string | null {
   if (typeof window === "undefined") return null;
   const probe = document.createElement("div");
   probe.style.color = `var(${cssVar})`;
   probe.style.display = "none";
   document.body.appendChild(probe);
-  const rgb = getComputedStyle(probe).color;
+  const resolved = getComputedStyle(probe).color;
   document.body.removeChild(probe);
-  const parts = rgb.match(/[\d.]+/g);
-  if (!parts || parts.length < 3) return null;
-  const [r, g, b] = parts.map((n) => Math.round(Number(n)));
-  return `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = resolved;
+  const hex = ctx.fillStyle;
+  return /^#[0-9a-f]{6}$/i.test(hex) ? hex : null;
 }
 
 /** Um seletor de cor com botão "Restaurar padrão" próprio — reaproveitado
@@ -130,7 +143,16 @@ export function BrandingForm({
   const [isRemovingLogo, startRemoveLogo] = useTransition();
 
   useEffect(() => {
-    if (state.ok) toast.success("Aparência atualizada.");
+    if (state.ok) {
+      toast.success("Aparência atualizada.");
+      // Limpa o preview local do arquivo escolhido: a partir daqui a
+      // fonte da verdade volta a ser a prop `logoUrl` (já atualizada
+      // pelo `revalidatePath` da action) — sem isso, um logo trocado
+      // ou removido depois continuava mostrando este preview antigo
+      // pra sempre (bug real: só sumia com F5).
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reage ao resultado da Server Action (sistema externo), não espelha render.
+      setFilePreview(null);
+    }
   }, [state]);
 
   async function handleResetPrimary() {
@@ -155,6 +177,10 @@ export function BrandingForm({
     startRemoveLogo(async () => {
       const result = await resetOrganizationLogo();
       if (result.ok) {
+        // Mesmo motivo do efeito acima: sem limpar, o preview local
+        // (se algum arquivo tivesse sido escolhido antes) continuaria
+        // mostrando a imagem antiga por cima do "sem logo" real.
+        setFilePreview(null);
         toast.success("Logo removido — voltou pra marca oficial do sistema.");
       } else {
         toast.error(result.message ?? "Não foi possível remover o logo.");
