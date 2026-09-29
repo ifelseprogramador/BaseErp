@@ -4,9 +4,9 @@ import type { Database } from "@/core/db";
 import { organizations } from "@/db/schema/tenancy";
 import { organizationBackupSettings, organizationBackups } from "@/db/schema/backup";
 
-/** Quantos backups automáticos guardar por organização — o cron
- * (`api/cron/backup/route.ts`) apaga os mais antigos além disso a cada
- * rodada. */
+/** Quantos backups automáticos guardar por organização (padrão) — o
+ * cron (`api/cron/backup/route.ts`) apaga os mais antigos além disso a
+ * cada rodada. */
 export const AUTO_BACKUP_RETENTION = 7;
 
 export const BACKUP_VERSION = 1;
