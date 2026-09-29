@@ -5,9 +5,11 @@ import { requireEnv } from "@/core/env";
 /**
  * Envia um evento de Realtime Broadcast a partir do servidor (dentro de
  * uma Server Action), sem manter conexão aberta — usa o envio via REST do
- * Realtime (`channel.send`) em vez do client `createBrowserClient`. Ver
- * `core/live-support/realtime.ts` para os nomes de canal e o modelo de
- * confiança (autoridade sempre no banco, o Broadcast só avisa "releia").
+ * Realtime (`channel.send`, disponível desde supabase-js 2.37) em vez do
+ * client `createBrowserClient` (pensado pra rodar no navegador, com
+ * cookies/sessão, que não faz sentido aqui). Ver core/live-support/realtime.ts
+ * para os nomes de canal e o modelo de confiança (autoridade sempre no
+ * banco, o Broadcast só avisa "releia").
  */
 export async function sendBroadcast(channelName: string, event: string, payload: unknown) {
   const supabase = createClient(

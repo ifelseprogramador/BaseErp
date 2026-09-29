@@ -28,6 +28,8 @@ fi
 # shellcheck source=./foundation-paths.sh
 source "$BASE_DIR/scripts/foundation-paths.sh"
 
+VERTICAL_NAME="$(basename "$VERTICAL_DIR")"
+
 is_excluded() {
   local rel="$1"
   for ex in "${FOUNDATION_EXCLUDE_PATHS[@]}"; do
@@ -35,7 +37,7 @@ is_excluded() {
       return 0
     fi
   done
-  return 1
+  is_vertical_excluded "$VERTICAL_NAME" "$rel"
 }
 
 # Defesa em profundidade — mesmo raciocínio de sync-to-vertical.sh: nunca
@@ -45,6 +47,11 @@ rsync_excludes_for() {
   local rel="$1"
   local ex
   for ex in "${FOUNDATION_EXCLUDE_PATHS[@]}"; do
+    if [[ "$ex" == "$rel"/* ]]; then
+      echo "--exclude=${ex#"$rel"/}"
+    fi
+  done
+  for ex in ${VERTICAL_PATH_EXCLUDES[$VERTICAL_NAME]:-}; do
     if [[ "$ex" == "$rel"/* ]]; then
       echo "--exclude=${ex#"$rel"/}"
     fi

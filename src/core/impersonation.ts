@@ -6,5 +6,5 @@
  * dele em `getActiveOrg()` reconfirma que o usuário da sessão atual É um
  * platform admin antes de honrar. Expira sozinho em 2h por segurança.
  */
-export const IMPERSONATION_COOKIE = "baseerp_impersonate_org";
+export const IMPERSONATION_COOKIE = "platform_impersonate_org";
 export const IMPERSONATION_MAX_AGE_SECONDS = 60 * 60 * 2;

@@ -4,8 +4,10 @@ import { createBrowserClient } from "@supabase/ssr";
 // `requireEnv(name)`/`process.env[name]`. O Next.js só consegue substituir
 // uma variável `NEXT_PUBLIC_*` pelo valor real no bundle do navegador
 // quando enxerga a propriedade escrita literalmente no código — um acesso
-// dinâmico por string vira `undefined` em produção E em dev, silenciosamente.
-// Ver docs/decisoes.md.
+// dinâmico por string vira `undefined` em produção E em dev, silenciosamente
+// (só falha em runtime, dentro do navegador, quando o código roda — não no
+// build nem no servidor, onde `process.env` está sempre completo). Ver
+// docs/decisoes.md.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

@@ -18,13 +18,13 @@ if (!connectionString) {
 const client = postgres(connectionString, { prepare: false });
 
 /**
- * Conexão única da aplicação. DIVERGÊNCIA DELIBERADA do mecano-erp (ver
- * docs/decisoes.md, "RLS ativa desde o início"): o papel Postgres por
- * trás de `DATABASE_URL` aqui NÃO tem `bypassrls`. Isso significa que
- * `db.select()...` chamado direto, fora de `runWithUserContext`/`withOrg`/
- * `requireAdmin`, sempre volta vazio para qualquer tabela com
- * `apply_org_rls()` aplicado — falha fechado por padrão, nunca vaza dado
- * de outra organização por esquecimento de um filtro manual.
+ * Conexão única da aplicação. O papel Postgres por trás de
+ * `DATABASE_URL` NÃO tem `bypassrls` (ver docs/decisoes.md, "RLS ativa
+ * desde o início") — `db.select()...` chamado direto, fora de
+ * `runWithUserContext`/`withOrg`/`requireAdmin`, sempre volta vazio para
+ * qualquer tabela com `apply_org_rls()` aplicado — falha fechado por
+ * padrão, nunca vaza dado de outra organização por esquecimento de um
+ * filtro manual.
  */
 export const db = drizzle(client, { schema });
 

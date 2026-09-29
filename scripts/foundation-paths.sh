@@ -46,9 +46,21 @@ FOUNDATION_PATHS=(
   "src/core/platform-admin.ts"
   "src/core/impersonation.ts"
   "src/core/user-lookup.ts"
+  "src/core/registry.ts"
+  "src/core/module-settings.ts"
+  "src/core/logger.ts"
+  "src/core/document.ts"
+  "src/core/csv.ts"
+  "src/core/csv-import.ts"
+  "src/core/env.ts"
+  "src/core/supabase/admin.ts"
+  "src/core/supabase/client.ts"
+  "src/core/supabase/middleware.ts"
+  "src/core/supabase/realtime-sender.ts"
   "src/core/profile"
   "src/core/admin/validation.ts"
   "src/core/admin/components/organization-name-form.tsx"
+  "src/app/(auth)/actions.ts"
   "src/components/theme-provider.tsx"
   "src/components/org-branding-style.tsx"
   "src/components/brand-icon.tsx"
@@ -83,3 +95,29 @@ FOUNDATION_PATHS=(
 FOUNDATION_EXCLUDE_PATHS=(
   "src/core/brand.ts"
 )
+
+# Exceções POR VERTICAL: caminhos que estão em FOUNDATION_PATHS (servem
+# BaseERP/outros verticais normalmente) mas que, num vertical específico,
+# têm uma divergência REAL de comportamento — nunca sincronizados NEM
+# PRA NEM DE aquele vertical em particular. Chave = nome da pasta do
+# vertical (basename do caminho em verticals.txt).
+#
+# mecano-erp: `stale-service-worker-cleanup.tsx` desregistra QUALQUER
+# service worker encontrado — seguro no BaseERP/Prisma, que não têm
+# nenhum de verdade, mas destruiria o service worker real do mecano-erp
+# (`public/sw.js`, modo offline). `app/layout.tsx` só diverge por causa
+# do import/uso desse componente — o resto (metadata via `core/brand.ts`
+# etc.) já é idêntico.
+declare -A VERTICAL_PATH_EXCLUDES=(
+  [mecano-erp]="src/components/stale-service-worker-cleanup.tsx src/app/layout.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx src/app/(app)/perfil/page.tsx src/db/schema/tenancy.ts src/core/admin/validation.ts src/core/profile/actions.ts"
+)
+
+is_vertical_excluded() {
+  local vertical_name="$1" rel="$2" ex
+  for ex in ${VERTICAL_PATH_EXCLUDES[$vertical_name]:-}; do
+    if [ "$rel" = "$ex" ] || [[ "$rel" == "$ex"/* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}

@@ -1,8 +1,5 @@
 # Lista de verticais nascidos do BaseERP que o hook `post-commit` (ver
 # `scripts/install-sync-hook.sh`) sincroniza automaticamente. Um caminho
 # por linha, absoluto. Linhas em branco e começando com `#` são ignoradas.
-#
-# mecano-erp fica de fora por enquanto — usa uma arquitetura de RLS
-# diferente (bypassrls/db direto em vez de withDb/RLS ativa) e a
-# unificação com ele foi explicitamente adiada (ver docs/decisoes.md).
 /home/eduardo/code/prisma
+/home/eduardo/code/mecano-erp

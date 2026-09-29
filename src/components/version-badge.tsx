@@ -41,14 +41,16 @@ function formatChangelogDate(isoDate: string) {
  * Selo "vX.Y.Z" discreto no canto do menu. Clique abre o histórico de
  * versões (`core/changelog.ts`). Uma bolinha aparece enquanto a pessoa
  * ainda não abriu o histórico desde a última atualização — some ao
- * abrir. Guardado em `localStorage` (conveniência por navegador; se não
- * der pra ler/gravar, só não mostra a bolinha).
+ * abrir. Guardado em `localStorage` (conveniência por navegador; se
+ * não der pra ler/gravar, só não mostra a bolinha).
  */
 export function VersionBadge({ className }: { className?: string }) {
   const [hasUnseen, setHasUnseen] = useState(false);
 
   useEffect(() => {
     try {
+      // `localStorage` não existe no render do servidor — só dá pra
+      // comparar depois de montar.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setHasUnseen(localStorage.getItem(LAST_SEEN_KEY) !== APP_VERSION);
     } catch {
@@ -85,6 +87,10 @@ export function VersionBadge({ className }: { className?: string }) {
           <span className="bg-primary absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full" />
         )}
       </DialogTrigger>
+      {/* Cabeçalho e rodapé FIXOS, só o meio rola — antes o "X" padrão
+          do Dialog era pequeno e fácil de não achar numa lista comprida.
+          Agora dá pra sair pela seta de voltar (topo), pelo botão
+          "Fechar" (sempre visível embaixo), pelo Esc ou clicando fora. */}
       <DialogContent
         showCloseButton={false}
         className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
@@ -103,6 +109,9 @@ export function VersionBadge({ className }: { className?: string }) {
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
           {CHANGELOG.map((entry, index) => (
+            // `<details>` nativo: a versão atual já vem aberta, as
+            // anteriores recolhidas — lista curta por padrão, sem perder
+            // o histórico (um toque abre cada uma).
             <details
               key={entry.version}
               open={index === 0}
