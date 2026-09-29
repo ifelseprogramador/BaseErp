@@ -30,7 +30,7 @@ export default function LoginPage() {
       <Card>
         <CardHeader>
           <CardTitle>Entrar</CardTitle>
-          <CardDescription>Acesse o painel da sua oficina.</CardDescription>
+          <CardDescription>Acesse o painel da sua organização.</CardDescription>
         </CardHeader>
         <CardContent>
           <LoginForm />

@@ -107,9 +107,13 @@ FOUNDATION_EXCLUDE_PATHS=(
 # nenhum de verdade, mas destruiria o service worker real do mecano-erp
 # (`public/sw.js`, modo offline). `app/layout.tsx` só diverge por causa
 # do import/uso desse componente — o resto (metadata via `core/brand.ts`
-# etc.) já é idêntico.
+# etc.) já é idêntico. `login/page.tsx`: texto de UI voltado a oficina
+# mecânica ("Acesse o painel da sua oficina."), deliberadamente
+# diferente do genérico "organização" do BaseERP/Prisma — bug real já
+# aconteceu aqui (commit de reconciliação vazou "oficina" pro BaseERP
+# via sync reverso antes desta exceção existir, revertido na hora).
 declare -A VERTICAL_PATH_EXCLUDES=(
-  [mecano-erp]="src/components/stale-service-worker-cleanup.tsx src/app/layout.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx src/app/(app)/perfil/page.tsx src/db/schema/tenancy.ts src/core/admin/validation.ts src/core/profile/actions.ts"
+  [mecano-erp]="src/components/stale-service-worker-cleanup.tsx src/app/layout.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx src/app/(app)/perfil/page.tsx src/app/(auth)/login/page.tsx src/db/schema/tenancy.ts src/core/admin/validation.ts src/core/profile/actions.ts"
 )
 
 is_vertical_excluded() {
