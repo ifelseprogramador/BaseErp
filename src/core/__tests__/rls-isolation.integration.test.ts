@@ -108,9 +108,21 @@ describe.skipIf(!canRun)("isolamento por RLS entre organizações", () => {
 
   afterAll(async () => {
     const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-    await sql`delete from memberships where organization_id in (${orgAId}, ${orgBId})`;
-    await sql`delete from organizations where id in (${orgAId}, ${orgBId})`;
-    await sql`delete from platform_admins where user_id = ${adminUserId}`;
+    // Bug real encontrado rodando a versão equivalente deste teste no
+    // mecano-erp contra o Supabase de produção: sem
+    // `set_config('app.current_user_id', ...)` antes de cada delete, a
+    // RLS bloqueia SILENCIOSAMENTE a própria limpeza (0 linhas afetadas,
+    // sem erro) — as fixtures de teste ficam órfãs em produção. Precisa
+    // do contexto do admin (`adminUserId`) pra
+    // `is_current_user_platform_admin()` liberar. Corrigido aqui também
+    // por prevenção, mesmo sem confirmação de que já aconteceu neste
+    // projeto — ver docs/decisoes.md.
+    await sql.begin(async (tx) => {
+      await tx`select set_config('app.current_user_id', ${adminUserId}, true)`;
+      await tx`delete from memberships where organization_id in (${orgAId}, ${orgBId})`;
+      await tx`delete from organizations where id in (${orgAId}, ${orgBId})`;
+      await tx`delete from platform_admins where user_id = ${adminUserId}`;
+    });
     await sql.end();
     await Promise.all(
       [adminUserId, userAId, userBId].map((id) => supabaseAdmin.auth.admin.deleteUser(id)),
