@@ -24,15 +24,23 @@ const initialState: ActionResult = { ok: false };
  * o seletor mostraria um azul arbitrário no primeiro acesso em vez da
  * cor padrão de verdade do sistema.
  *
- * Normaliza via `<canvas>` (`fillStyle`), não parseando o texto de
- * `getComputedStyle` na mão: navegadores modernos podem devolver a cor
- * computada no PRÓPRIO formato usado no CSS (`oklch(...)`), não sempre
- * `rgb(...)`. Uma regex que assume `rgb(r, g, b)` lê `oklch(L, C, H)`
- * como se fossem R/G/B e produz uma cor de fantasia — bug real
- * encontrado em produção (a cor inicial do seletor nunca batia com a
- * cor de verdade do sistema). `canvas.fillStyle` aceita qualquer
- * sintaxe de cor CSS válida e sempre devolve de volta em `#rrggbb`,
- * sem essa ambiguidade. */
+ * Normaliza desenhando num `<canvas>` de 1x1 e lendo o PIXEL renderizado
+ * (`getImageData`), não reparseando texto na mão nem confiando na
+ * string que `canvas.fillStyle` devolve de volta. Dois bugs reais já
+ * encontrados aqui, nessa ordem:
+ *  1) `getComputedStyle` pode devolver a cor computada no PRÓPRIO
+ *     formato usado no CSS (`oklch(...)`/`lab(...)`), não sempre
+ *     `rgb(...)` — uma regex que assumia `rgb(r, g, b)` lia os números
+ *     errados e produzia uma cor de fantasia.
+ *  2) Trocar pra `canvas.fillStyle = cor; canvas.fillStyle` (reler a
+ *     STRING) pareceu resolver, mas o Chromium testado em produção
+ *     devolve a string de volta NO MESMO formato não-hex recebido
+ *     (`fillStyle` aceita `lab(...)` na escrita, mas a leitura não
+ *     normaliza pra `#rrggbb` como a spec do Canvas 2D deixa a
+ *     entender) — a regex de hex rejeitava e caía no azul de
+ *     fallback. Ler o PIXEL depois de um `fillRect` é a única via
+ *     garantida: o canvas SEMPRE rasteriza em sRGB 0–255,
+ *     independente da sintaxe de cor usada no `fillStyle`. */
 function resolveCssVarAsHex(cssVar: string): string | null {
   if (typeof window === "undefined") return null;
   const probe = document.createElement("div");
@@ -43,11 +51,14 @@ function resolveCssVarAsHex(cssVar: string): string | null {
   document.body.removeChild(probe);
 
   const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   ctx.fillStyle = resolved;
-  const hex = ctx.fillStyle;
-  return /^#[0-9a-f]{6}$/i.test(hex) ? hex : null;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /** Um seletor de cor com botão "Restaurar padrão" próprio — reaproveitado
