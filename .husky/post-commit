@@ -1,0 +1,7 @@
+# Instalado por scripts/install-sync-hook.sh — não editar direto, edite
+# scripts/sync-foundation-commit.sh e rode o instalador de novo.
+./scripts/sync-foundation-commit.sh || {
+  echo "[post-commit] sync-foundation-commit.sh falhou — o commit no BaseERP" >&2
+  echo "[post-commit] foi feito normalmente, mas a propagação automática não" >&2
+  echo "[post-commit] rodou. Rode manualmente: ./scripts/sync-foundation-commit.sh" >&2
+}

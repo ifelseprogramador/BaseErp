@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "sidebar_color" text;

@@ -12,7 +12,15 @@ export interface UserDisplayInfo {
 
 /**
  * `auth.users` não é modelado pelo Drizzle (schema gerenciado pelo
- * Supabase Auth) — lido com SQL bruto, na mesma conexão/transação.
+ * Supabase Auth) — e, com RLS ativa, um `select` direto nessa tabela
+ * pelo papel da aplicação sempre devolve 0 linhas: `auth.users` tem RLS
+ * própria do Supabase (fora do controle deste projeto), que não conhece
+ * `app.current_user_id`/`is_current_user_platform_admin()`. Por isso o
+ * lookup passa pela função SECURITY DEFINER
+ * `public.get_user_display_info` (`migrations-custom/0010_...sql`), que
+ * atravessa essa RLS de propósito e só devolve linha se quem chamou for
+ * platform admin — checado DENTRO da função, não aqui.
+ *
  * Único lugar que monta esse lookup: toda tela que precisa mostrar quem
  * é uma pessoa a partir de um `userId` solto (lista de membros,
  * histórico de auditoria, "quem leu" de notificação) usa isto em vez de
@@ -30,10 +38,10 @@ export async function getUserDisplayInfoByIds(
     email: string | null;
     display_name: string | null;
   }>(
-    sql`select id, email, raw_user_meta_data->>'display_name' as display_name from auth.users where id in (${sql.join(
-      ids.map((id) => sql`${id}`),
+    sql`select * from public.get_user_display_info(array[${sql.join(
+      ids.map((id) => sql`${id}::uuid`),
       sql`, `,
-    )})`,
+    )}])`,
   );
 
   return new Map(

@@ -58,6 +58,7 @@ export const organizations = pgTable("organizations", {
   // `--primary` em `globals.css`; `logoUrl` aponta para um objeto no
   // bucket público `branding` do Supabase Storage.
   primaryColor: text("primary_color"),
+  sidebarColor: text("sidebar_color"),
   logoUrl: text("logo_url"),
 
   // Controle de acesso pelo dono da plataforma (área /admin). `status`

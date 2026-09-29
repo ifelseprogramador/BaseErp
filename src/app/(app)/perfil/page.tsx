@@ -13,7 +13,11 @@ export default async function ProfilePage() {
 
   const [org] = await withDb((db) =>
     db
-      .select({ primaryColor: organizations.primaryColor, logoUrl: organizations.logoUrl })
+      .select({
+        primaryColor: organizations.primaryColor,
+        sidebarColor: organizations.sidebarColor,
+        logoUrl: organizations.logoUrl,
+      })
       .from(organizations)
       .where(eq(organizations.id, organizationId))
       .limit(1),
@@ -51,7 +55,11 @@ export default async function ProfilePage() {
             <CardTitle>Aparência da organização</CardTitle>
           </CardHeader>
           <CardContent>
-            <BrandingForm primaryColor={org?.primaryColor ?? null} logoUrl={org?.logoUrl ?? null} />
+            <BrandingForm
+              primaryColor={org?.primaryColor ?? null}
+              sidebarColor={org?.sidebarColor ?? null}
+              logoUrl={org?.logoUrl ?? null}
+            />
           </CardContent>
         </Card>
       )}

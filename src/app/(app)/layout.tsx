@@ -1,7 +1,7 @@
 import "@/core/load-modules";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LogOut, Building2, Headset, User } from "lucide-react";
+import { LogOut, Headset, User } from "lucide-react";
 import {
   getActiveOrg,
   getSession,
@@ -21,6 +21,8 @@ import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { VersionBadge } from "@/components/version-badge";
 import { OrgBrandingStyle } from "@/components/org-branding-style";
+import { BrandIcon } from "@/components/brand-icon";
+import { BRAND } from "@/core/brand";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -57,7 +59,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     throw err;
   }
 
-  const displayName = (user?.user_metadata?.display_name as string | undefined) ?? org.userEmail;
+  const displayName =
+    (user?.user_metadata?.display_name as string | undefined) ?? org.organizationName;
 
   const { withDb } = await withOrg();
   const modules = await withDb((tx) => getEnabledModulesForOrg(tx, org.organizationId));
@@ -70,7 +73,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen flex-1 flex-col">
-      <OrgBrandingStyle primaryColor={org.primaryColor} />
+      <OrgBrandingStyle primaryColor={org.primaryColor} sidebarColor={org.sidebarColor} />
       {org.impersonating && (
         <div className="flex items-center justify-between bg-amber-500 px-4 py-2 text-sm font-medium text-amber-950 print:hidden">
           <span className="flex items-center gap-2">
@@ -91,16 +94,31 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="border-sidebar-border flex items-center gap-2 border-b px-4 py-3.5">
             {org.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- URL dinâmica do Supabase Storage, fora do domínio de imagens do Next.
-              <img src={org.logoUrl} alt={org.organizationName} className="h-6 w-auto" />
+              <img
+                src={org.logoUrl}
+                alt={org.organizationName}
+                className="h-6 w-auto object-contain"
+              />
             ) : (
               <>
-                <Building2 className="text-sidebar-primary h-5 w-5" />
-                <span className="font-semibold">BaseERP</span>
+                <BrandIcon className="text-sidebar-primary h-5 w-5" />
+                <span className="font-semibold">{BRAND.name}</span>
               </>
             )}
           </div>
           <SidebarNav modules={modules} />
-          <div className="border-sidebar-border mt-auto border-t px-2 py-2">
+          <div className="border-sidebar-border mt-auto flex flex-col gap-2 border-t px-2 py-2">
+            {/* A marca do vertical (ícone + nome — mesma dupla do topo
+                antes de escolher um logo próprio, e o mesmo ícone da
+                tela de login) só desce pra cá quando a organização já
+                tem um logo próprio ocupando o topo — sem isso, mostrar
+                duas vezes. */}
+            {org.logoUrl && (
+              <div className="text-sidebar-foreground/60 flex items-center gap-1.5 px-1 text-xs">
+                <BrandIcon className="h-3.5 w-3.5" />
+                <span>{BRAND.name}</span>
+              </div>
+            )}
             <VersionBadge className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground" />
           </div>
         </aside>
@@ -109,19 +127,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <header className="flex items-center justify-between border-b px-4 py-3 print:hidden">
             <div className="flex items-center gap-2">
               <MobileNav modules={modules} />
-              <span className="text-sm font-medium">{org.organizationName}</span>
+              <span className="text-sm font-medium">{displayName}</span>
             </div>
             <div className="flex items-center gap-3">
               <NotificationBell organizationId={org.organizationId} initialItems={notifications} />
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  render={
-                    <Button variant="ghost" size="sm" className="gap-2">
-                      <User className="h-4 w-4" />
-                      <span className="text-muted-foreground hidden sm:inline">{displayName}</span>
-                    </Button>
-                  }
-                />
+                  render={<Button variant="ghost" size="sm" className="gap-2" />}
+                >
+                  <User className="h-4 w-4" />
+                  <span className="text-muted-foreground hidden sm:inline">{org.userEmail}</span>
+                </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem render={<Link href="/perfil" />}>
                     <User className="h-4 w-4" />

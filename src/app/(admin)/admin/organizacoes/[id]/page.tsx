@@ -4,7 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/core/admin-auth";
 import { getOrganizationForAdmin } from "@/core/admin/queries";
-import { hardDeleteOrganization, updateBilling } from "@/core/admin/actions";
+import {
+  hardDeleteOrganization,
+  updateBilling,
+  updateOrganizationName,
+} from "@/core/admin/actions";
+import { OrganizationNameForm } from "@/core/admin/components/organization-name-form";
 import { OrgStatusToggle } from "@/core/admin/components/org-status-toggle";
 import { ImpersonateButton } from "@/core/admin/components/impersonate-button";
 import { BillingForm } from "@/core/admin/components/billing-form";
@@ -33,6 +38,7 @@ export default async function AdminOrganizationDetailPage({
   const { organization: org, members, moduleSettings, audit } = data;
   const updateBillingWithId = updateBilling.bind(null, org.id);
   const hardDeleteWithId = hardDeleteOrganization.bind(null, org.id);
+  const updateNameWithId = updateOrganizationName.bind(null, org.id);
 
   const overrideBySlug = new Map(moduleSettings.map((m) => [m.moduleSlug, m.enabled]));
   const modules = getAllModules().map((m) => ({
@@ -43,12 +49,15 @@ export default async function AdminOrganizationDetailPage({
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
           <BackButton href="/admin" />
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{org.name}</h1>
-            <div className="mt-1 flex gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1">
+              <h1 className="truncate text-2xl font-semibold tracking-tight">{org.name}</h1>
+              <OrganizationNameForm currentName={org.name} action={updateNameWithId} />
+            </div>
+            <div className="mt-1 flex flex-wrap gap-2">
               <Badge variant={org.status === "blocked" ? "destructive" : "secondary"}>
                 {org.status === "blocked" ? "Bloqueada" : "Ativa"}
               </Badge>
@@ -56,7 +65,7 @@ export default async function AdminOrganizationDetailPage({
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <ImpersonateButton organizationId={org.id} />
           <OrgStatusToggle organizationId={org.id} status={org.status} />
         </div>
@@ -106,17 +115,17 @@ export default async function AdminOrganizationDetailPage({
           {members.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhum usuário vinculado.</p>
           ) : (
-            <ul className="flex flex-col gap-2 text-sm">
+            <ul className="flex flex-col gap-3 text-sm">
               {members.map((m) => (
-                <li key={m.id} className="flex items-center justify-between gap-2">
+                <li key={m.id} className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
+                    {/* m.name já resolve pra display_name (Perfil), senão
+                        e-mail, senão o próprio UID (core/user-lookup.ts)
+                        — nunca precisa repetir o e-mail aqui embaixo. */}
                     <p className="truncate">{m.name}</p>
-                    <p className="text-muted-foreground truncate font-mono text-xs">
-                      {m.email && m.email !== m.name ? `${m.email} · ` : ""}
-                      {m.userId}
-                    </p>
+                    <p className="text-muted-foreground truncate font-mono text-xs">{m.userId}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{m.role === "owner" ? "Dono" : "Equipe"}</Badge>
                     {!m.active && <Badge variant="destructive">Bloqueado</Badge>}
                     <ResetMemberPasswordButton

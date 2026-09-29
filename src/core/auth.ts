@@ -90,6 +90,7 @@ interface ActiveOrgResult {
   impersonating: boolean;
   organizationStatus: "active" | "blocked";
   primaryColor: string | null;
+  sidebarColor: string | null;
   logoUrl: string | null;
 }
 
@@ -124,6 +125,7 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
           name: organizations.name,
           status: organizations.status,
           primaryColor: organizations.primaryColor,
+          sidebarColor: organizations.sidebarColor,
           logoUrl: organizations.logoUrl,
         })
         .from(organizations)
@@ -140,6 +142,7 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
           impersonating: true,
           organizationStatus: org.status,
           primaryColor: org.primaryColor,
+          sidebarColor: org.sidebarColor,
           logoUrl: org.logoUrl,
         };
       }
@@ -155,6 +158,7 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
         organizationName: organizations.name,
         organizationStatus: organizations.status,
         primaryColor: organizations.primaryColor,
+        sidebarColor: organizations.sidebarColor,
         logoUrl: organizations.logoUrl,
       })
       .from(memberships)
@@ -179,6 +183,7 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
       impersonating: false,
       organizationStatus: "active", // já teria lançado acima se bloqueada
       primaryColor: membership.primaryColor,
+      sidebarColor: membership.sidebarColor,
       logoUrl: membership.logoUrl,
     };
   });

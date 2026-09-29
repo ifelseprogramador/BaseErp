@@ -57,6 +57,13 @@ export function describeColumns(table: Table): ColumnDescriptor[] {
  * vertical que criar módulos com backup próprio deve registrar as
  * colunas de data deles em `registerBackupTable` (abaixo), não editar
  * este arquivo.
+ *
+ * ATENÇÃO: só colunas `timestamp()` do Drizzle entram aqui. Uma coluna
+ * `date()` (modo string, ex.: `orderDate` em pedidos) precisa
+ * PERMANECER como string "AAAA-MM-DD" — convertê-la pra `Date` aqui
+ * quebra o insert de restauração ("must be of type string ... Received
+ * an instance of Date"). Bug real já encontrado nisso — ver
+ * docs/decisoes.md.
  */
 const DATE_COLUMNS: Record<string, string[]> = {};
 

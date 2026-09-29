@@ -22,7 +22,11 @@ export function DisplayNameForm({ initialDisplayName }: { initialDisplayName: st
     <form action={formAction} className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
         <Label htmlFor="displayName">Nome de exibição</Label>
+        {/* `key`: sem isso, o input (não controlado) não reflete um
+            `defaultValue` novo depois que o server revalida — ficaria
+            preso no valor de quando montou pela primeira vez. */}
         <Input
+          key={initialDisplayName}
           id="displayName"
           name="displayName"
           defaultValue={initialDisplayName}

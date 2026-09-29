@@ -436,3 +436,123 @@ mostrar nome **e** código (UUID) juntos — o pedido inicial (replicar
 nome amigável) tirou o UUID de vez, mas o dono da plataforma preferiu
 manter os dois visíveis (útil pra achar alguém no dashboard do Supabase
 por exemplo).
+
+## 2026-09-28 (cont.) — `core/brand.ts`: extração do que diferencia cada vertical + automação real de sincronização
+
+Pedido explícito do dono da plataforma: a regra de manutenção (entrada
+de 2026-09-24 acima) até então era só um princípio manual — "lembre de
+replicar". A partir daqui existe automação de verdade entre este
+template e o `prisma` (o `mecano-erp` fica de fora por enquanto, por
+pedido explícito, porque usa uma arquitetura de RLS diferente —
+`bypassrls`/`db` direto em vez de `withDb`/RLS ativa — e precisaria de
+adaptação, não cópia direta).
+
+**Pré-requisito**: pra um arquivo poder ficar byte-idêntico entre
+BaseERP e um vertical, o único conteúdo que realmente diferencia um
+vertical do outro (nome, tagline, cor de marca, ícone, link de política
+de privacidade) precisou sair dos arquivos de layout/metadata pra um
+único lugar: `src/core/brand.ts` (interface `BrandConfig` — `name`,
+`tagline`, `primaryHex`, `iconPaths: string[]`, `privacyPolicyHref?`) +
+`src/components/brand-icon.tsx` (renderiza um `<svg>` a partir de
+`BRAND.iconPaths`, componente genérico). Isso tornou
+`app/(app)/layout.tsx`, `app/(auth)/login/page.tsx`, `app/icon.tsx`,
+`app/apple-icon.tsx`, `app/opengraph-image.tsx` e `app/layout.tsx`
+(metadata raiz) byte-idênticos entre os dois projetos — `core/brand.ts`
+em si é o único arquivo que nunca sincroniza (fica na lista de exclusão
+tanto do script de comparação quanto do de sincronização).
+
+**Mecanismo** (`scripts/` deste repo):
+
+- `check-drift.sh` (já existia) — só compara e lista divergência, nunca
+  aplica nada. Serve pra auditoria manual pontual.
+- `sync-to-vertical.sh <caminho-do-vertical> [arquivos...]` — sincroniza
+  de verdade (copia/`rsync --delete`, e apaga no vertical o que foi
+  apagado aqui), reusando a mesma lista `FOUNDATION_PATHS`. Sem lista de
+  arquivos, sincroniza tudo; com lista, só o que foi passado. Só copia e
+  dá `git add` no vertical — nunca commita nem dá push sozinho.
+- `sync-foundation-commit.sh` — lógica do hook: olha o que o commit que
+  acabou de rodar em `HEAD` tocou (`git diff-tree`), filtra pro que cai
+  dentro de `FOUNDATION_PATHS`, e se algo bateu, roda
+  `sync-to-vertical.sh` pra cada linha de `scripts/verticals.txt`
+  (arquivo simples, um caminho absoluto por linha) e **commita
+  localmente** no vertical (mensagem `sync(base-erp): <assunto do
+commit original>`, referenciando o SHA). Não faz nada se o commit não
+  tocou fundação.
+- `install-sync-hook.sh` — escreve `.husky/post-commit`. **Correção
+  importante**: a primeira versão escrevia em `.git/hooks/post-commit`,
+  que NUNCA dispara neste projeto — `core.hooksPath` aponta pra
+  `.husky/_` (Husky gerencia os hooks), então qualquer coisa em
+  `.git/hooks/` é ignorada silenciosamente. Corrigido pra escrever em
+  `.husky/post-commit` (formato Husky v9: script puro, sem o
+  boilerplate antigo `. "$(dirname -- "$0")/_/husky.sh"`, que o próprio
+  Husky marca como removido no v10). Diferente de `.git/hooks/`,
+  `.husky/` é versionado — o arquivo gerado fica no git, mas o
+  instalador continua idempotente (rodar de novo só reescreve).
+
+**Decisão consciente de onde o automático para**: o hook commita local
+no vertical, mas **nunca dá `git push`** — um push dispara deploy em
+produção (Vercel, no caso do prisma) e é uma ação que afeta sistema
+compartilhado; a regra geral deste projeto (ver `AGENTS.md`) trata isso
+como ação que sempre passa por confirmação explícita, mesmo com a
+automação de sincronização ligada. O fluxo esperado depois de um commit
+que mexeu em fundação: o hook já deixou o commit pronto no vertical →
+rodar `npm run check` lá → revisar → dar push manual.
+
+**Por que hook local de `post-commit` e não GitHub Actions**: um
+workflow cross-repo (BaseERP → prisma) precisaria de um PAT/deploy key
+novo com permissão de escrita no repo do prisma, secret que não existe
+hoje neste ambiente; o hook local reusa as credenciais de git já
+configuradas na máquina de desenvolvimento, sem superfície nova de
+segredo. Troca: só sincroniza quando alguém commita a partir desta
+mesma máquina — aceitável pro estágio atual (um único
+desenvolvedor/máquina).
+
+**Dois bugs reais encontrados testando o próprio mecanismo antes de
+confiar nele** (a lição maior desta entrega — testar a automação de
+verdade contra o Prisma real, não só ler o script, achou os dois):
+
+1. **`rsync -a --delete` numa pasta inteira apaga o que só existe no
+   vertical**: a primeira versão tratava `FOUNDATION_PATHS` com
+   entradas de DIRETÓRIO amplo (`src/core` inteiro, `src/app/(admin)`
+   inteiro, `src/app/(auth)` inteiro) e usava `--delete` pra manter o
+   destino idêntico à origem. Rodar de verdade contra o Prisma
+   apagaria `core/privacy/`, `core/business-type-presets.ts` e
+   `core/audit-log.ts` — arquivos que só existem no Prisma, sem
+   equivalente no BaseERP. Corrigido removendo `--delete` do
+   `sync-to-vertical.sh`.
+2. **Diretório inteiro sincronizado também SOBRESCREVE arquivos que têm
+   o mesmo nome nos dois projetos mas legitimamente DIVERGEM**: mesmo
+   sem `--delete`, sincronizar `src/core` inteiro porque um único
+   arquivo dentro dele mudou (ex.: só `core/auth.ts`) copiava TODO o
+   conteúdo de `src/core` do BaseERP por cima do Prisma — sobrescrevendo
+   `core/admin/actions.ts` (tem lógica de cascata de tabelas de negócio
+   que só existe no Prisma), `core/registry.ts`/`core/logger.ts` (
+   comentários e padrões que já divergiram entre os dois),
+   `core/live-support/*`, páginas de `(admin)` com polish mobile
+   específico do Prisma, `components/layout/mobile-nav.tsx` (nome do
+   vertical hardcoded — "Prisma" virava "BaseERP") e
+   `components/layout/sidebar-nav.tsx` (o item de menu de LGPD, que só
+   o Prisma tem, desaparecia). Testado num sync real contra o
+   `/home/eduardo/code/prisma`, revertido manualmente (`git restore
+--staged --worktree`) antes de qualquer commit chegar a acontecer.
+
+**Correção estrutural, não só um patch**: `FOUNDATION_PATHS` deixou de
+misturar diretórios amplos com arquivos — virou `scripts/foundation-paths.sh`,
+fonte única (`source`ada por `sync-to-vertical.sh` e
+`sync-foundation-commit.sh`), file-level por padrão. Só entra um
+diretório inteiro na lista depois de confirmar com `diff -rq` que os
+dois lados são IDÊNTICOS agora (ex.: `core/profile/`, sem nenhuma
+lógica de negócio, sem histórico de divergência) — nunca por suposição.
+`sync-foundation-commit.sh` também passou a propagar o ARQUIVO exato
+que o commit tocou (não a entrada inteira de `FOUNDATION_PATHS` que ele
+casou), reforçando o mesmo princípio: nunca sincronizar mais do que o
+commit realmente mudou. Divergência legítima conhecida (listada em
+comentário no topo de `foundation-paths.sh`) fica de fora da automação
+de propósito — continua só no `check-drift.sh`, pra revisão manual.
+
+**Lição pra quem mexer nesta automação depois**: "parece óbvio que essa
+pasta deveria ficar idêntica" não é o mesmo que "está confirmado que
+está idêntica agora". Um vertical maduro (o Prisma já tem meses de
+desenvolvimento próprio) acumula divergência legítima até em arquivos
+que nasceram idênticos — automação de sincronização de fundação só é
+segura no nível de granularidade que alguém efetivamente verificou.
