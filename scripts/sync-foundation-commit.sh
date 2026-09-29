@@ -16,6 +16,17 @@ cd "$BASE_DIR"
 COMMIT_SHA="$(git rev-parse HEAD)"
 COMMIT_MSG_SUBJECT="$(git log -1 --pretty=%s "$COMMIT_SHA")"
 
+# Trava contra loop: se este commit já é ele mesmo um commit gerado pela
+# sincronização (mensagem começa com "sync("), nunca propaga de novo —
+# sem isso, um commit automático aqui dispararia o hook reverso do
+# vertical, que criaria outro commit automático aqui, ad infinitum. Ver
+# docs/decisoes.md.
+case "$COMMIT_MSG_SUBJECT" in
+  sync\(*)
+    exit 0
+    ;;
+esac
+
 # Fonte única de FOUNDATION_PATHS/FOUNDATION_EXCLUDE_PATHS — mesma usada
 # por sync-to-vertical.sh.
 # shellcheck source=./foundation-paths.sh
