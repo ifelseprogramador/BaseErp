@@ -37,12 +37,12 @@ deploy, não uma tarefa à parte pra fazer "depois": se o commit vai pra
 se `APP_VERSION` (primeira entrada do changelog) não bater com
 `package.json#version` — ver `src/core/__tests__/changelog.test.ts`.
 
-**RLS ativa**: diferente do projeto de referência (mecano-erp), aqui a
-Row-Level Security do Postgres é a proteção ativa, não só defesa em
-profundidade — toda query de módulo passa por `withOrg()#withDb` (nunca
-`core/db.ts#db` direto). Ver docs/decisoes.md antes de mexer em
-`core/auth.ts`, `core/admin-auth.ts`, `core/db.ts` ou em
-`src/db/migrations-custom/`.
+**RLS ativa**: a Row-Level Security do Postgres é a proteção ativa,
+não só defesa em profundidade — toda query de módulo passa por
+`withOrg()#withDb` (nunca `core/db.ts#db` direto). Todo vertical
+nascido deste template (Prisma, mecano-erp) segue o mesmo padrão. Ver
+docs/decisoes.md antes de mexer em `core/auth.ts`, `core/admin-auth.ts`,
+`core/db.ts` ou em `src/db/migrations-custom/`.
 
 Antes de mexer em roteamento, Server Actions, middleware ou qualquer API
 do Next.js: este projeto está no Next.js 16, que tem breaking changes em

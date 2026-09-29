@@ -155,6 +155,63 @@ módulo.
   (serialização Server → Client Component).
 - `@tanstack/react-table` não é usado — tabelas shadcn puras.
 
+## Verticais e sincronização de fundação
+
+Cada vertical (Prisma, mecano-erp, ...) é um clone deste template que já
+tem seus próprios módulos de negócio. Pra evitar que uma correção na
+fundação (auth, RLS, admin, backup genérico, perfil, branding...) precise
+ser feita manualmente em cada um, existe uma automação bidirecional via
+hook `post-commit` (`scripts/install-sync-hook.sh`), guiada por uma lista
+única de arquivos: `scripts/foundation-paths.sh` (`FOUNDATION_PATHS`).
+
+**Como funciona, na prática**: comitar normalmente em qualquer um dos
+projetos (BaseERP, Prisma ou um vertical futuro). Se o commit tocou um
+arquivo que está em `FOUNDATION_PATHS`, o hook propaga sozinho:
+
+- Commit no **BaseERP** → copia pra **todo mundo** listado em
+  `scripts/verticals.txt`, um commit automático (`sync(base-erp): ...`)
+  por vertical.
+- Commit num **vertical** → copia só de volta pro **BaseERP**, um commit
+  automático (`sync(<vertical>): ...`) lá.
+- Nunca vertical → vertical direto: sempre passa pelo BaseERP primeiro
+  (dois commits automáticos em sequência, cada um pedindo revisão e
+  `npm run check` antes do `push`, que **nunca é automático**).
+- Arquivos de `src/modules/<modulo>/` nunca entram nessa lista — são a
+  parte que deveria mesmo divergir entre verticais, o hook nem olha pra
+  eles.
+
+**Exceção por vertical** (`VERTICAL_PATH_EXCLUDES`, no mesmo
+`foundation-paths.sh`): quando um arquivo geralmente é fundação mas tem
+uma divergência REAL de comportamento só num vertical específico (ex.:
+mecano-erp tem service worker próprio, texto de UI voltado a "oficina"
+em vez de "organização"), ele entra nessa lista em vez de virar uma
+edição manual toda vez que o hook tentar igualar — nunca sincroniza
+naquele vertical específico, em nenhum sentido, mas continua servindo os
+outros normalmente. Ver `docs/decisoes.md`, 2026-09-29, para o caso real
+que motivou isso (um texto vazou do mecano-erp pro BaseERP antes dessa
+exceção existir).
+
+### Criando um vertical novo
+
+1. `cp -r base-erp <novo-projeto>`, tirar o `.git` de dentro e iniciar um
+   repositório novo — isso já traz toda a fundação pronta, sem nenhum
+   módulo de negócio.
+2. Criar os módulos de negócio em `src/modules/<modulo>/`, seguindo
+   `src/modules/README.md` (inclui chamar `registerModule`/
+   `registerBackupTable` no próprio `module.ts`).
+3. Preencher `src/core/brand.ts` (nome, cor, ícone, tagline) — o único
+   arquivo de fundação que NUNCA sincroniza de propósito
+   (`FOUNDATION_EXCLUDE_PATHS`), é o que diferencia cada projeto.
+4. Adicionar o caminho absoluto do projeto novo numa linha em
+   `base-erp/scripts/verticals.txt` e rodar
+   `base-erp/scripts/install-sync-hook.sh` de novo — instala o hook nos
+   dois sentidos pro projeto novo, que a partir daí entra no mesmo ciclo
+   de sincronização automática dos outros.
+5. Se algum arquivo específico dele precisar divergir de propósito da
+   fundação, adicionar a entrada dele em `VERTICAL_PATH_EXCLUDES`, com o
+   mesmo critério: só exceção quando a diferença é de propósito, nunca
+   força do hábito/cópia desatualizada.
+
 ## Deploy
 
 Preparado para Vercel, região `gru1` (`vercel.json`). `api/health` para

@@ -610,3 +610,39 @@ não é o mesmo que "reverter tudo que o teste sujou", porque um arquivo
 NOVO sujado não aparece como "modificado de algo bom conhecido", ele
 aparece como "adicionado" — e pode ser fácil de tratar como parte do
 que deveria mesmo ser commitado.
+
+## 2026-09-29 — mecano-erp entra na automação de sync; `VERTICAL_PATH_EXCLUDES`
+
+Depois que o mecano-erp migrou pra RLS ativa (`docs/decisoes.md` de lá,
+mesma data — deixou de usar `bypassrls`), a arquitetura ficou igual à do
+BaseERP/Prisma o suficiente pra entrar na mesma automação. Reconciliados
+~25 arquivos de fundação que só divergiam por histórico (comentário
+desatualizado citando "mecano-erp usa bypassrls", lógica de módulo
+vazada pro `core/backup.ts` — virou o motor genérico
+`registerBackupTable()`, igual ao Prisma). Detalhe completo da
+reconciliação em `mecano-erp/docs/decisoes.md`, mesma data.
+`mecano-erp` adicionado a `scripts/verticals.txt`.
+
+**Mecanismo novo**: `VERTICAL_PATH_EXCLUDES` em
+`scripts/foundation-paths.sh` — exceção POR VERTICAL pra um arquivo que
+geralmente é fundação mas tem divergência REAL de comportamento só ali
+(ex.: mecano-erp tem service worker próprio de verdade, texto de UI
+voltado a "oficina" em vez de "organização" — ver a lista completa e o
+porquê de cada entrada direto no script). `sync-to-vertical.sh`/
+`sync-to-base.sh` passaram a consultar essa lista tanto pra pular um
+arquivo inteiro quanto (via `rsync_excludes_for`) pra excluir um arquivo
+específico de dentro de uma entrada de DIRETÓRIO.
+
+**Bug real pego na hora**: antes dessa exceção existir, um sync reverso
+(mecano-erp → BaseERP) trocou "Acesse o painel da sua organização." por
+"...sua oficina." no `login/page.tsx` do BaseERP — o arquivo estava na
+lista geral de fundação, mas o texto de UI do mecano-erp é
+deliberadamente diferente. Corrigido no commit seguinte, e o arquivo
+entrou em `VERTICAL_PATH_EXCLUDES[mecano-erp]`. Lição: um arquivo só
+pode ficar em `FOUNDATION_PATHS` se for byte-idêntico em TODOS os
+verticais que o herdam, não só nos que já foram checados — texto de UI
+(não só lógica) conta como divergência real.
+
+Seção nova em `docs/arquitetura.md` ("Verticais e sincronização de
+fundação") documenta o fluxo do dia a dia e o passo a passo de criar um
+vertical novo.
