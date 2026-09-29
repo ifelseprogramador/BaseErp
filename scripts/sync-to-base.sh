@@ -38,6 +38,19 @@ is_excluded() {
   return 1
 }
 
+# Defesa em profundidade — mesmo raciocínio de sync-to-vertical.sh: nunca
+# confiar só no `is_excluded` acima (que só filtra a entrada de TO_SYNC
+# em si) se uma entrada de FOUNDATION_PATHS voltar a ser diretório amplo.
+rsync_excludes_for() {
+  local rel="$1"
+  local ex
+  for ex in "${FOUNDATION_EXCLUDE_PATHS[@]}"; do
+    if [[ "$ex" == "$rel"/* ]]; then
+      echo "--exclude=${ex#"$rel"/}"
+    fi
+  done
+}
+
 if [ "$#" -gt 0 ]; then
   TO_SYNC=("$@")
 else
@@ -68,7 +81,8 @@ for rel in "${TO_SYNC[@]}"; do
     # SEM --delete — mesmo motivo de sync-to-vertical.sh: o BaseERP não
     # deve perder nada por causa de uma pasta cujo conteúdo, do lado do
     # vertical, tenha mais arquivos do que o esperado.
-    rsync -a "$vertical_path/" "$base_path/"
+    mapfile -t rsync_excludes < <(rsync_excludes_for "$rel")
+    rsync -a "${rsync_excludes[@]}" "$vertical_path/" "$base_path/"
   else
     cp "$vertical_path" "$base_path"
   fi

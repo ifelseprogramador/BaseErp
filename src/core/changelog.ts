@@ -24,6 +24,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.0",
+    date: "2026-09-28",
+    changes: [
+      {
+        type: "novo",
+        text: 'Em Perfil, a cor de destaque (botões) e a cor do menu lateral agora são dois controles separados, com botão "Restaurar cor padrão" e botão pra remover o logo enviado.',
+      },
+      {
+        type: "novo",
+        text: "Botão para mostrar/esconder a senha digitada, tanto no login quanto ao trocar a senha.",
+      },
+      {
+        type: "novo",
+        text: "O administrador da plataforma agora pode renomear uma organização depois de criada.",
+      },
+      {
+        type: "novo",
+        text: "O ícone na aba do navegador e a imagem que aparece ao compartilhar o link agora mostram a marca do sistema.",
+      },
+      {
+        type: "correcao",
+        text: "Ao apagar definitivamente uma organização, a conta de acesso de cada pessoa dela também é removida agora — antes só os dados ficavam apagados.",
+      },
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-09-28",
     changes: [

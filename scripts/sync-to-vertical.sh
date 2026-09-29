@@ -46,6 +46,23 @@ is_excluded() {
   return 1
 }
 
+# Defesa em profundidade: se algum dia uma entrada de FOUNDATION_PATHS
+# voltar a ser um diretório amplo, isso monta os `--exclude` de verdade
+# pro rsync, pra qualquer FOUNDATION_EXCLUDE_PATHS que caia DENTRO dele
+# nunca ser copiado — não confiar só no `is_excluded` acima, que só
+# filtra a entrada de TO_SYNC em si, nunca o que existe dentro dela.
+# Bug real encontrado: `core/brand.ts` foi sobrescrito assim quando
+# `src/core` ainda era uma entrada de diretório (ver docs/decisoes.md).
+rsync_excludes_for() {
+  local rel="$1"
+  local ex
+  for ex in "${FOUNDATION_EXCLUDE_PATHS[@]}"; do
+    if [[ "$ex" == "$rel"/* ]]; then
+      echo "--exclude=${ex#"$rel"/}"
+    fi
+  done
+}
+
 # Se chamado com uma lista explícita de arquivos (o hook faz isso,
 # restringindo aos arquivos que o commit realmente tocou), sincroniza
 # só esses; senão, sincroniza a lista inteira de FOUNDATION_PATHS.
@@ -83,7 +100,8 @@ for rel in "${TO_SYNC[@]}"; do
     # apagaria esses arquivos do vertical toda vez que a fundação
     # sincronizasse. Só adiciona/atualiza o que existe no BaseERP; nunca
     # remove o que só existe no vertical.
-    rsync -a "$base_path/" "$target_path/"
+    mapfile -t rsync_excludes < <(rsync_excludes_for "$rel")
+    rsync -a "${rsync_excludes[@]}" "$base_path/" "$target_path/"
   else
     cp "$base_path" "$target_path"
   fi

@@ -556,3 +556,57 @@ está idêntica agora". Um vertical maduro (o Prisma já tem meses de
 desenvolvimento próprio) acumula divergência legítima até em arquivos
 que nasceram idênticos — automação de sincronização de fundação só é
 segura no nível de granularidade que alguém efetivamente verificou.
+
+## 2026-09-28 (cont.) — Terceiro bug real: `core/brand.ts` do Prisma foi sobrescrito pelo do BaseERP
+
+Reportado pelo dono da plataforma depois do commit automático ter ido
+pra produção: a logo/nome mostrados no Prisma viraram os do BaseERP
+("BaseERP" + ícone de prédio em vez de "Prisma" + ícone de gema).
+
+**Causa raiz**: no teste inicial do mecanismo (mesma sessão, ver entrada
+acima "Dois bugs reais..."), quando `src/core` ainda era sincronizado
+como diretório inteiro, `core/brand.ts` do Prisma (que JÁ tinha conteúdo
+próprio — nome, cor, ícone do Prisma — criado antes da automação
+existir) foi sobrescrito pela cópia do BaseERP. `is_excluded()` só
+filtrava a entrada de `FOUNDATION_PATHS`/`TO_SYNC` em si (ex.:
+`"src/core/brand.ts"` como entrada própria) — nunca impedia que um
+arquivo excluído fosse copiado por TABELA quando estava dentro de um
+diretório sincronizado por inteiro (`rsync -a "$base/src/core/"
+"$target/src/core/"` copia TUDO dentro, `core/brand.ts` incluso, sem
+nenhum `--exclude` real passado pro `rsync`).
+
+Na hora de reverter manualmente os arquivos sobrescritos por aquele
+teste (`git restore --staged --worktree <lista de arquivos>`),
+`core/brand.ts` foi ESQUECIDO da lista — porque era um arquivo NOVO
+(nunca commitado antes daquela sessão), `git restore` não teria uma
+versão de `HEAD` pra restaurar mesmo se eu tivesse lembrado de incluí-lo
+(diferente dos outros arquivos revertidos, que já existiam em commits
+anteriores). O conteúdo errado (BaseERP) ficou no working tree, staged,
+e acabou sendo commitado como `src/core/brand.ts` "novo" no primeiro
+commit automático (`sync(base-erp): ...`) que foi pra produção.
+
+**Corrigido**: conteúdo do `core/brand.ts` do Prisma restaurado
+manualmente (nome "Prisma", tagline, cor, `iconPaths` do ícone "gem",
+`privacyPolicyHref: "/privacidade"`) a partir do que estava registrado
+nesta conversa antes do bug acontecer.
+
+**Correção estrutural** (pra nunca mais poder acontecer, mesmo se uma
+entrada de diretório amplo voltar pra `FOUNDATION_PATHS` no futuro):
+`sync-to-vertical.sh` e `sync-to-base.sh` ganharam `rsync_excludes_for()`
+— monta `--exclude` de VERDADE pro `rsync`, computado a partir de
+`FOUNDATION_EXCLUDE_PATHS`, pra qualquer entrada de diretório. Antes,
+`FOUNDATION_EXCLUDE_PATHS` só protegia um arquivo se ele fosse
+sincronizado como sua PRÓPRIA entrada de `TO_SYNC` — não protegia contra
+estar dentro de uma pasta maior sendo copiada. Com a lista atual
+(file-level, `core/brand.ts` nunca aninhado dentro de nenhuma entrada de
+diretório como `core/profile`), o bug não se repetiria de qualquer
+forma — mas o `--exclude` real é defesa em profundidade, não depende de
+ninguém lembrar dessa invariante ao editar `foundation-paths.sh` depois.
+
+**Lição mais dura desta sessão**: um `git restore` de emergência,
+feito rápido no meio de descobrir um bug, precisa da MESMA atenção que
+o bug original — "reverter os arquivos que apareceram na lista de diff"
+não é o mesmo que "reverter tudo que o teste sujou", porque um arquivo
+NOVO sujado não aparece como "modificado de algo bom conhecido", ele
+aparece como "adicionado" — e pode ser fácil de tratar como parte do
+que deveria mesmo ser commitado.

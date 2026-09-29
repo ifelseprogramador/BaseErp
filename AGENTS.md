@@ -25,6 +25,18 @@ correção ou melhoria for feita numa peça que pertence ao
 core/tenancy/RLS/admin enquanto se trabalha num vertical nascido deste
 template, essa mudança deve ser replicada de volta para o BaseERP.
 
+**Regra de versionamento**: antes de dar `git push` de qualquer mudança
+significativa (uma feature nova, uma correção que a pessoa usuária
+percebe, não um ajuste interno/refactor invisível), adicionar uma
+entrada nova em `src/core/changelog.ts` (topo do array `CHANGELOG`,
+nunca editar uma versão já publicada) e bumpar `package.json#version`
+pra bater com ela — `correção = patch, algo novo = minor` (ver o
+comentário no topo do próprio `changelog.ts`). Isso faz parte do
+deploy, não uma tarefa à parte pra fazer "depois": se o commit vai pra
+`main` e vai ser publicado, a versão sobe junto. `npm run test` falha
+se `APP_VERSION` (primeira entrada do changelog) não bater com
+`package.json#version` — ver `src/core/__tests__/changelog.test.ts`.
+
 **RLS ativa**: diferente do projeto de referência (mecano-erp), aqui a
 Row-Level Security do Postgres é a proteção ativa, não só defesa em
 profundidade — toda query de módulo passa por `withOrg()#withDb` (nunca
