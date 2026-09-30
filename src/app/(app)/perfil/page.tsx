@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession, withOrg } from "@/core/auth";
@@ -63,6 +64,20 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>E-mail de envio (avançado)</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-4 text-sm">
+          <span className="text-muted-foreground">
+            Opcional: faça o sistema enviar orçamentos e notas por e-mail, com PDF anexo.
+          </span>
+          <Link href="/perfil/email" className="text-primary font-medium whitespace-nowrap">
+            Configurar
+          </Link>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -13,3 +13,4 @@ export * from "./schema/tenancy";
 export * from "./schema/live-support";
 export * from "./schema/backup";
 export * from "./schema/notifications";
+export * from "./schema/sharing";

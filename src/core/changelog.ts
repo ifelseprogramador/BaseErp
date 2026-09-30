@@ -24,6 +24,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.0",
+    date: "2026-09-30",
+    changes: [
+      {
+        type: "novo",
+        text: 'Botão "Enviar ao cliente": gera um link seguro (válido por 30 dias) e um PDF do documento, e envia por WhatsApp, e-mail ou pelo compartilhamento do celular, com o PDF anexado.',
+      },
+      {
+        type: "novo",
+        text: "Em Perfil, opção avançada para configurar o e-mail da sua empresa e enviar documentos por e-mail com PDF anexo, direto pelo sistema.",
+      },
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-09-28",
     changes: [

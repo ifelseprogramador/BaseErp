@@ -646,3 +646,34 @@ verticais que o herdam, não só nos que já foram checados — texto de UI
 Seção nova em `docs/arquitetura.md` ("Verticais e sincronização de
 fundação") documenta o fluxo do dia a dia e o passo a passo de criar um
 vertical novo.
+
+## 2026-09-30 — Compartilhar documentos com o cliente (core/share)
+
+Botão único `ShareDocumentButton` (fundação, sincroniza com os verticais)
+para enviar orçamento/pedido/OS/nota ao cliente.
+
+- **Snapshot + link público**: cada vertical monta um `ShareDocumentInput`
+  (modelo neutro: emissor, cliente, seções, tabela, totais, links) e chama
+  `createSharedDocument`. Grava `shared_documents` com o **hash** (sha256) de
+  um token de 256 bits; o link `/d/<token>` mostra a página e
+  `/d/<token>/pdf` o PDF (`pdf-lib`). O cliente vê o que foi enviado, mesmo
+  que o pedido mude depois. Expira em 30 dias e pode ser revogado.
+- **Leitura sem sessão**: função `public.get_shared_document(hash)`
+  (SECURITY DEFINER, migrations-custom/0007) — só devolve documento não
+  expirado/não revogado e conta a visualização. Nenhuma tabela de negócio é
+  aberta ao público; `/d/` entrou em `PUBLIC_PATHS` do proxy. Páginas com
+  `noindex`, sem cache e `referrer: no-referrer`.
+- **Canais**: compartilhar nativo do celular com PDF anexo (Web Share API,
+  fallback sem arquivo), WhatsApp (`wa.me` com link — `wa.me` não anexa
+  arquivo; DDI 55 assumido), copiar link, baixar PDF e e-mail. E-mail direto
+  é **opcional** por organização (`organization_email_settings`, SMTP via
+  `nodemailer`, só o dono configura); sem ele o botão abre o `mailto:`.
+- **Segredos**: senha SMTP com AES-256-GCM (`core/crypto.ts`,
+  `SETTINGS_ENCRYPTION_KEY` fora do banco). Host SMTP bloqueia
+  localhost/rede privada (SSRF básico; DNS rebinding não coberto).
+- **LGPD**: o snapshot guarda dado pessoal do cliente; por isso expira e é
+  revogável. Falta um cron de purga dos expirados (pendência).
+- **Não coberto**: anexo automático no WhatsApp (exige API oficial paga).
+- Cada vertical precisa: `npm i pdf-lib nodemailer`, `export * from
+"./schema/sharing"` em `src/db/schema.ts` e a migration do drizzle +
+  `0007_sharing_rls.sql` adaptada ao seu numeral de migrations-custom.

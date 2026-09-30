@@ -3,7 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireEnv } from "@/core/env";
 
-const PUBLIC_PATHS = ["/login"];
+// "/d/" = link público de documento compartilhado com o cliente (core/share).
+const PUBLIC_PATHS = ["/login", "/d/"];
 
 /**
  * Renova a sessão do Supabase a cada request e redireciona para /login
