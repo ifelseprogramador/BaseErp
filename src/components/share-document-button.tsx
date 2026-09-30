@@ -1,9 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { siTelegram, siWhatsapp } from "simple-icons";
-import { Check, Copy, Download, FileText, Loader2, Mail, Send, Share2 } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  FileText,
+  Loader2,
+  Mail,
+  Plus,
+  RotateCcw,
+  Save,
+  Send,
+  Share2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +30,18 @@ import {
 import { Hint } from "@/components/hint";
 import { sendShareByEmail } from "@/core/share/actions";
 import type { ShareLinkResult } from "@/core/share/create";
+import { SHARE_VARS, renderShareTemplate } from "@/core/share/template";
+
+const TEMPLATE_KEY = (kind?: string) => `share-template:${kind ?? "outro"}`;
+
+/** Modelo preferido desta pessoa neste navegador (localStorage pode estar bloqueado). */
+function loadSavedTemplate(kind?: string): string | null {
+  try {
+    return localStorage.getItem(TEMPLATE_KEY(kind));
+  } catch {
+    return null;
+  }
+}
 
 /** wa.me exige DDI: assume Brasil (55) quando o número tem 10 ou 11 dígitos. */
 function whatsappUrl(phone: string | undefined, text: string) {
@@ -93,7 +117,8 @@ export function ShareDocumentButton({
 }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<ShareLinkResult | null>(null);
-  const [text, setText] = useState("");
+  const [template, setTemplate] = useState("");
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const [email, setEmail] = useState("");
   const [copied, setCopied] = useState(false);
   const [loading, startLoading] = useTransition();
@@ -111,7 +136,7 @@ export function ShareDocumentButton({
         return;
       }
       setResult(r);
-      setText(r.text ?? "");
+      setTemplate(loadSavedTemplate(r.kind) ?? r.template ?? "");
       setEmail(r.recipient?.email ?? "");
     });
   }
@@ -129,6 +154,40 @@ export function ShareDocumentButton({
     } catch (err) {
       if ((err as Error).name !== "AbortError") toast.error("Não foi possível compartilhar.");
     }
+  }
+
+  // Texto final (variáveis trocadas) usado em todos os canais.
+  const text = result ? renderShareTemplate(template, result.vars ?? {}) : "";
+  const textWithoutLink = result
+    ? renderShareTemplate(template, { ...result.vars, link: "" }, { ensureLink: false })
+    : "";
+
+  function insertVar(key: string) {
+    const el = textRef.current;
+    const token = `{${key}}`;
+    const start = el?.selectionStart ?? template.length;
+    const end = el?.selectionEnd ?? template.length;
+    setTemplate(template.slice(0, start) + token + template.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + token.length, start + token.length);
+    });
+  }
+
+  function saveTemplate() {
+    try {
+      localStorage.setItem(TEMPLATE_KEY(result?.kind), template);
+      toast.success("Mensagem salva como seu padrão.");
+    } catch {
+      toast.error("Não foi possível salvar neste navegador.");
+    }
+  }
+
+  function resetTemplate() {
+    try {
+      localStorage.removeItem(TEMPLATE_KEY(result?.kind));
+    } catch {}
+    setTemplate(result?.template ?? "");
   }
 
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -164,14 +223,51 @@ export function ShareDocumentButton({
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="share-text">Mensagem</Label>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="share-text">Mensagem</Label>
+                  <Hint>
+                    Escreva do seu jeito. Toque nos botões para inserir dados do cliente e do
+                    documento: eles são trocados pelos valores reais na hora de enviar. O link vai
+                    sempre ao final se você não colocar.
+                  </Hint>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHARE_VARS.filter((v) => v.key !== "link").map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => insertVar(v.key)}
+                      className="bg-muted hover:bg-muted/70 flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition"
+                    >
+                      <Plus className="h-3 w-3" />
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
                 <Textarea
                   id="share-text"
-                  rows={3}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  ref={textRef}
+                  rows={4}
+                  value={template}
+                  onChange={(e) => setTemplate(e.target.value)}
                 />
+                <div className="flex gap-1">
+                  <Button type="button" variant="ghost" size="xs" onClick={saveTemplate}>
+                    <Save className="mr-1 h-3.5 w-3.5" />
+                    Salvar como meu padrão
+                  </Button>
+                  <Button type="button" variant="ghost" size="xs" onClick={resetTemplate}>
+                    <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                    Voltar ao original
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-muted-foreground text-xs">Como o cliente vai receber:</p>
+                  <div className="max-h-32 overflow-y-auto rounded-xl rounded-tl-sm bg-[#d9fdd3] px-3 py-2 text-sm whitespace-pre-line text-[#111b21] shadow-sm dark:bg-[#005c4b] dark:text-[#e9edef]">
+                    {text}
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -200,7 +296,7 @@ export function ShareDocumentButton({
                   subtitle={phoneLabel ? `Conversa com ${phoneLabel}` : "Escolher o contato"}
                 />
                 <ChannelLink
-                  href={`https://t.me/share/url?url=${encodeURIComponent(result.url!)}&text=${encodeURIComponent(text.replace(result.url!, "").trim())}`}
+                  href={`https://t.me/share/url?url=${encodeURIComponent(result.url!)}&text=${encodeURIComponent(textWithoutLink)}`}
                   color={`#${siTelegram.hex}`}
                   icon={<BrandIcon icon={siTelegram} />}
                   title="Telegram"

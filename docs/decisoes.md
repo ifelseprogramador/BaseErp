@@ -677,3 +677,18 @@ para enviar orçamento/pedido/OS/nota ao cliente.
 - Cada vertical precisa: `npm i pdf-lib nodemailer`, `export * from
 "./schema/sharing"` em `src/db/schema.ts` e a migration do drizzle +
   `0007_sharing_rls.sql` adaptada ao seu numeral de migrations-custom.
+
+## 2026-09-30 — Mensagem de envio editável + correção do link relativo
+
+- `core/share/template.ts` (puro): modelo com variáveis `{primeiro_nome}`,
+  `{numero}`, `{total}`, `{empresa}`, `{link}`… O botão mostra as variáveis
+  como botões com nomes em português, insere no cursor e exibe uma prévia
+  (bolha de WhatsApp) do texto final, usado em WhatsApp, Telegram, e-mail e
+  compartilhamento nativo. Sem `{link}` no texto, o link vai ao final.
+  "Salvar como meu padrão" guarda o modelo por tipo de documento em
+  `localStorage` (por navegador; compartilhar entre usuários exigiria tabela).
+- **Bug**: `NEXT_PUBLIC_SITE_URL=` vazio no `.env.local` virava link relativo
+  (`??` não trata string vazia). `core/share/origin.ts#resolveOrigin` usa
+  vazio como "não configurado"; coberto por teste.
+- Ícones de marca via `simple-icons` (WhatsApp/Telegram); dependência a
+  instalar em cada vertical.

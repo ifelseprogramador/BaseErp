@@ -5,7 +5,8 @@ import { withOrg } from "@/core/auth";
 import { eq } from "drizzle-orm";
 import { organizationEmailSettings, sharedDocuments } from "@/db/schema";
 import { resolveOrigin } from "./origin";
-import { shareDocumentSchema, buildShareMessage, type ShareDocumentInput } from "./document";
+import { shareDocumentSchema, SHARE_KIND_LABELS, type ShareDocumentInput } from "./document";
+import { DEFAULT_SHARE_TEMPLATE, type ShareVars } from "./template";
 
 export const SHARE_DEFAULT_TTL_DAYS = 30;
 
@@ -25,8 +26,11 @@ export interface ShareLinkResult {
   shareId?: string;
   url?: string;
   pdfUrl?: string;
-  /** Mensagem pronta para WhatsApp/e-mail (editável no botão). */
-  text?: string;
+  /** Tipo do documento (chave para guardar o modelo de mensagem preferido). */
+  kind?: string;
+  /** Modelo padrão da mensagem e valores das variáveis (editáveis no botão). */
+  template?: string;
+  vars?: ShareVars;
   recipient?: { phone?: string; email?: string };
   emailEnabled?: boolean;
   expiresAt?: string;
@@ -106,7 +110,17 @@ export async function createSharedDocument(
     shareId: row.id,
     url,
     pdfUrl: `${url}/pdf`,
-    text: buildShareMessage(doc, url),
+    kind: doc.kind,
+    template: DEFAULT_SHARE_TEMPLATE,
+    vars: {
+      nome: doc.customerName,
+      primeiro_nome: doc.customerName?.split(" ")[0] || "tudo bem",
+      documento: SHARE_KIND_LABELS[doc.kind].toLowerCase(),
+      numero: doc.number,
+      total: doc.totals.find((t) => t.strong)?.value ?? doc.totals.at(-1)?.value,
+      empresa: doc.issuerName,
+      link: url,
+    },
     recipient: {
       phone: r.phone ? r.phone.replace(/\D/g, "") : undefined,
       email: r.email ?? undefined,

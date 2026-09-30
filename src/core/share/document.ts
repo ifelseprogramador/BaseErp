@@ -68,13 +68,3 @@ export const SHARE_KIND_LABELS: Record<ShareDocument["kind"], string> = {
   cobranca: "Cobrança",
   outro: "Documento",
 };
-
-/** Texto padrão da mensagem (WhatsApp/e-mail) — o usuário pode editar antes de enviar. */
-export function buildShareMessage(
-  doc: Pick<ShareDocument, "kind" | "title" | "number" | "issuerName" | "customerName">,
-  url: string,
-) {
-  const greeting = doc.customerName ? `Olá, ${doc.customerName.split(" ")[0]}!` : "Olá!";
-  const what = `${SHARE_KIND_LABELS[doc.kind].toLowerCase()}${doc.number ? ` nº ${doc.number}` : ""}`;
-  return `${greeting} Segue o ${what} de ${doc.issuerName}:\n${url}`;
-}

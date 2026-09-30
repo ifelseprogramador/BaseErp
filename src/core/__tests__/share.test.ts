@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { decryptSecret, encryptSecret } from "../crypto";
-import { buildShareMessage, shareDocumentSchema } from "../share/document";
+import { shareDocumentSchema } from "../share/document";
+import { DEFAULT_SHARE_TEMPLATE, renderShareTemplate } from "../share/template";
 import { renderSharePdf } from "../share/pdf";
 import { isAllowedSmtpHost } from "../share/email";
 import { resolveOrigin } from "../share/origin";
@@ -62,11 +63,28 @@ describe("documento compartilhável", () => {
     ).toBe(false);
     expect(shareDocumentSchema.safeParse({ ...doc, title: "" }).success).toBe(false);
   });
-  it("monta a mensagem com saudação e link", () => {
-    const msg = buildShareMessage(doc, "https://app/d/abc");
-    expect(msg).toContain("Olá, João!");
-    expect(msg).toContain("orçamento nº 42");
-    expect(msg).toContain("https://app/d/abc");
+  it("mescla o modelo com as variáveis", () => {
+    const msg = renderShareTemplate(DEFAULT_SHARE_TEMPLATE, {
+      primeiro_nome: "João",
+      documento: "orçamento",
+      numero: "42",
+      empresa: "Bordados da Ana",
+      total: "R$ 6.000,00",
+      link: "https://app/d/abc",
+    });
+    expect(msg).toBe(
+      "Olá, João! Segue o orçamento nº 42 de Bordados da Ana, no valor de R$ 6.000,00.\nhttps://app/d/abc",
+    );
+  });
+  it("variável vazia some sem deixar buraco e o link vai ao final se faltar", () => {
+    const msg = renderShareTemplate("Oi {primeiro_nome}, pedido {numero} {total} !", {
+      primeiro_nome: "Ana",
+      numero: "7",
+      link: "https://x/d/1",
+    });
+    expect(msg).toBe("Oi Ana, pedido 7!\nhttps://x/d/1");
+    expect(renderShareTemplate("Oi {link}", { link: "L" })).toBe("Oi L");
+    expect(renderShareTemplate("Oi", { link: "L" }, { ensureLink: false })).toBe("Oi");
   });
   it("renderiza PDF válido, multipágina, com acentos e caracteres fora do WinAnsi", async () => {
     const bytes = await renderSharePdf(doc);

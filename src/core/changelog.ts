@@ -24,6 +24,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.1",
+    date: "2026-09-30",
+    changes: [
+      {
+        type: "melhoria",
+        text: 'A janela "Enviar ao cliente" ficou mais clara, com botões nas cores do WhatsApp e do Telegram.',
+      },
+      {
+        type: "novo",
+        text: "A mensagem de envio agora é editável: toque nos botões (nome do cliente, número, valor, empresa) para inserir dados, veja a prévia e salve como seu texto padrão.",
+      },
+      {
+        type: "correcao",
+        text: "O link enviado ao cliente agora sai completo também quando o endereço do site não está configurado.",
+      },
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-09-30",
     changes: [
