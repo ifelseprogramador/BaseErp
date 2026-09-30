@@ -7,7 +7,6 @@ import {
   Check,
   Copy,
   Download,
-  FileText,
   Loader2,
   Mail,
   Plus,
@@ -80,11 +79,11 @@ function ChannelLink({
       target="_blank"
       rel="noopener noreferrer"
       style={{ backgroundColor: color, color: textColor }}
-      className="flex items-center gap-3 rounded-xl px-4 py-3 text-left shadow-sm transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.99]"
+      className="flex w-full min-w-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-left shadow-sm transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.99]"
     >
       {icon}
       <span className="flex min-w-0 flex-col leading-tight">
-        <span className="text-sm font-semibold">{title}</span>
+        <span className="truncate text-sm font-semibold">{title}</span>
         {subtitle && <span className="truncate text-xs opacity-80">{subtitle}</span>}
       </span>
     </a>
@@ -201,7 +200,7 @@ export function ShareDocumentButton({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] content-start gap-3 overflow-x-hidden overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-lg">
@@ -222,8 +221,8 @@ export function ShareDocumentButton({
               Preparando link e PDF…
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-3">
+              <div className="flex min-w-0 flex-col gap-2">
                 <div className="flex items-center gap-1.5">
                   <Label htmlFor="share-text">Mensagem</Label>
                   <Hint>
@@ -248,7 +247,7 @@ export function ShareDocumentButton({
                 <Textarea
                   id="share-text"
                   ref={textRef}
-                  rows={4}
+                  rows={3}
                   value={template}
                   onChange={(e) => setTemplate(e.target.value)}
                 />
@@ -264,7 +263,7 @@ export function ShareDocumentButton({
                 </div>
                 <div className="flex flex-col gap-1">
                   <p className="text-muted-foreground text-xs">Como o cliente vai receber:</p>
-                  <div className="max-h-32 overflow-y-auto rounded-xl rounded-tl-sm bg-[#d9fdd3] px-3 py-2 text-sm whitespace-pre-line text-[#111b21] shadow-sm dark:bg-[#005c4b] dark:text-[#e9edef]">
+                  <div className="max-h-24 overflow-y-auto rounded-xl rounded-tl-sm bg-[#d9fdd3] px-3 py-2 text-sm whitespace-pre-line text-[#111b21] shadow-sm dark:bg-[#005c4b] dark:text-[#e9edef]">
                     {text}
                   </div>
                 </div>
@@ -278,12 +277,16 @@ export function ShareDocumentButton({
                   <button
                     type="button"
                     onClick={nativeShare}
-                    className="bg-primary text-primary-foreground flex items-center gap-3 rounded-xl px-4 py-3 text-left shadow-sm transition hover:brightness-95 active:scale-[0.99]"
+                    className="bg-primary text-primary-foreground flex w-full min-w-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-left shadow-sm transition hover:brightness-95 active:scale-[0.99]"
                   >
                     <Share2 className="h-5 w-5 shrink-0" />
-                    <span className="flex flex-col leading-tight">
-                      <span className="text-sm font-semibold">Compartilhar com PDF anexo</span>
-                      <span className="text-xs opacity-80">Escolha o app no seu celular</span>
+                    <span className="flex min-w-0 flex-col leading-tight">
+                      <span className="truncate text-sm font-semibold">
+                        Compartilhar com PDF anexo
+                      </span>
+                      <span className="truncate text-xs opacity-80">
+                        Escolha o app no seu celular
+                      </span>
                     </span>
                   </button>
                 )}
@@ -304,7 +307,7 @@ export function ShareDocumentButton({
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5 rounded-xl border p-3">
+              <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border p-2.5">
                 <div className="flex items-center gap-1.5">
                   <Mail className="text-muted-foreground h-4 w-4" />
                   <Label htmlFor="share-email">E-mail</Label>
@@ -314,9 +317,10 @@ export function ShareDocumentButton({
                       : "Abre o seu aplicativo de e-mail com a mensagem e o link. Para o sistema enviar sozinho com PDF anexo, configure em Perfil › E-mail de envio."}
                   </Hint>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex min-w-0 gap-2">
                   <Input
                     id="share-email"
+                    className="min-w-0 flex-1"
                     type="email"
                     autoComplete="email"
                     placeholder="cliente@email.com"
@@ -357,7 +361,7 @@ export function ShareDocumentButton({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid min-w-0 grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -372,7 +376,7 @@ export function ShareDocumentButton({
                   ) : (
                     <Copy className="mr-1.5 h-4 w-4" />
                   )}
-                  Copiar link
+                  <span className="truncate">Copiar link</span>
                 </Button>
                 <Button
                   type="button"
@@ -380,9 +384,8 @@ export function ShareDocumentButton({
                   nativeButton={false}
                   render={<a href={result.pdfUrl} target="_blank" rel="noopener noreferrer" />}
                 >
-                  <FileText className="mr-1.5 h-4 w-4" />
-                  <Download className="mr-1 h-3.5 w-3.5" />
-                  Baixar PDF
+                  <Download className="mr-1.5 h-4 w-4 shrink-0" />
+                  <span className="truncate">Baixar PDF</span>
                 </Button>
               </div>
             </div>

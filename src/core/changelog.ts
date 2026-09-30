@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.2",
+    date: "2026-09-30",
+    changes: [
+      {
+        type: "correcao",
+        text: 'A janela "Enviar ao cliente" não passa mais do tamanho da tela: em telas pequenas ela rola por dentro e os botões ficam sempre dentro da janela.',
+      },
+    ],
+  },
+  {
     version: "0.4.1",
     date: "2026-09-30",
     changes: [
