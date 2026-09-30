@@ -5,6 +5,7 @@ import { decryptSecret, encryptSecret } from "../crypto";
 import { buildShareMessage, shareDocumentSchema } from "../share/document";
 import { renderSharePdf } from "../share/pdf";
 import { isAllowedSmtpHost } from "../share/email";
+import { resolveOrigin } from "../share/origin";
 
 const KEY = randomBytes(32).toString("base64");
 
@@ -91,5 +92,18 @@ describe("isAllowedSmtpHost", () => {
     }
     expect(isAllowedSmtpHost("smtp.gmail.com")).toBe(true);
     expect(isAllowedSmtpHost("200.10.20.30")).toBe(true);
+  });
+});
+
+describe("resolveOrigin", () => {
+  it("variável vazia ou só espaços cai no host da requisição (bug do link relativo)", () => {
+    expect(resolveOrigin("", "localhost:3000", null)).toBe("http://localhost:3000");
+    expect(resolveOrigin("   ", "app.exemplo.com", null)).toBe("https://app.exemplo.com");
+    expect(resolveOrigin(undefined, "app.exemplo.com", "https")).toBe("https://app.exemplo.com");
+  });
+  it("usa a URL configurada, sem barra final", () => {
+    expect(resolveOrigin("https://app.meusite.com.br/", "localhost:3000", null)).toBe(
+      "https://app.meusite.com.br",
+    );
   });
 });
