@@ -7,6 +7,7 @@ import { DEFAULT_SHARE_TEMPLATE, renderShareTemplate } from "../share/template";
 import { renderSharePdf } from "../share/pdf";
 import { isAllowedSmtpHost } from "../share/email";
 import { resolveOrigin } from "../share/origin";
+import { purgeCutoff } from "../share/purge";
 
 const KEY = randomBytes(32).toString("base64");
 
@@ -123,5 +124,13 @@ describe("resolveOrigin", () => {
     expect(resolveOrigin("https://app.meusite.com.br/", "localhost:3000", null)).toBe(
       "https://app.meusite.com.br",
     );
+  });
+});
+
+describe("purgeCutoff", () => {
+  it("só apaga depois da carência (7 dias por padrão)", () => {
+    const now = new Date("2026-10-10T12:00:00Z");
+    expect(purgeCutoff(now).toISOString()).toBe("2026-10-03T12:00:00.000Z");
+    expect(purgeCutoff(now, 0).toISOString()).toBe(now.toISOString());
   });
 });

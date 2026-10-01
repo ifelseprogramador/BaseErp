@@ -727,3 +727,14 @@ Continuam restritos ao dono da plataforma: `name`, ramo, status e cobrança.
 UI: card "Dados da empresa" em Perfil (`core/profile/components/company-form.tsx`,
 `core/profile/company-actions.ts`, só `role === "owner"`). Cada vertical aplica
 a migration e passa a ler `displayName ?? name` nos documentos.
+
+## 2026-09-30 — Limpeza dos documentos compartilhados expirados
+
+`shared_documents` guarda dado pessoal do cliente (snapshot). Antes só
+expirava (a leitura pública recusa); agora o cron `GET /api/cron/purge-shared`
+(`30 6 * * *`, logo depois do backup) apaga o que expirou ou foi revogado há
+mais de 7 dias (`core/share/purge.ts`). Mesma proteção do backup
+(`CRON_SECRET` + `runWithSystemContext`). A carência de 7 dias deixa o link
+"expirado" distinguível de "inexistente" por um tempo e dá margem para
+suporte. Backups (`organization_backups`) podem conter o snapshot até a
+própria rotação.

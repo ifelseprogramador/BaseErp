@@ -91,6 +91,7 @@ FOUNDATION_PATHS=(
   "src/app/(app)/layout.tsx"
   "src/app/(app)/perfil"
   "src/app/d"
+  "src/app/api/cron/purge-shared"
   "src/app/layout.tsx"
   "src/app/icon.tsx"
   "src/app/apple-icon.tsx"

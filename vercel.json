@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/backup",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/purge-shared",
+      "schedule": "30 6 * * *"
     }
   ]
 }
