@@ -241,7 +241,10 @@ export function SpreadsheetImportWizard({
                 {(
                   [
                     ["skip", "Pular — manter como está no sistema"],
-                    ["update", "Atualizar com os dados da planilha"],
+                    [
+                      "update",
+                      "Atualizar com os dados da planilha (célula em branco não apaga nada)",
+                    ],
                   ] as const
                 ).map(([v, l]) => (
                   <label key={v} className="flex items-center gap-2">
