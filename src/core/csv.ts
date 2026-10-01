@@ -18,14 +18,14 @@ export function toCsv(rows: Record<string, string>[], headers: string[]): string
   return "﻿" + lines.join("\r\n") + "\r\n";
 }
 
-export function parseCsv(text: string): Record<string, string>[] {
-  const rows = parseCsvRows(text.replace(/^﻿/, ""));
+export function parseCsv(text: string, delimiter = ","): Record<string, string>[] {
+  const rows = parseCsvRows(text.replace(/^﻿/, ""), delimiter);
   if (rows.length === 0) return [];
   const [header, ...dataRows] = rows;
   return dataRows.map((row) => Object.fromEntries(header.map((h, i) => [h.trim(), row[i] ?? ""])));
 }
 
-function parseCsvRows(text: string): string[][] {
+function parseCsvRows(text: string, delimiter = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -54,7 +54,7 @@ function parseCsvRows(text: string): string[][] {
       i++;
       continue;
     }
-    if (char === ",") {
+    if (char === delimiter) {
       row.push(field);
       field = "";
       i++;

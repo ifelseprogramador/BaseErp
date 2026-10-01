@@ -692,3 +692,25 @@ para enviar orçamento/pedido/OS/nota ao cliente.
   vazio como "não configurado"; coberto por teste.
 - Ícones de marca via `simple-icons` (WhatsApp/Telegram); dependência a
   instalar em cada vertical.
+
+## 2026-09-30 — Importar/exportar planilhas (core/spreadsheet)
+
+Infra genérica de planilha, usada pelos cadastros dos verticais (clientes
+primeiro). Aceita **.xlsx e .csv** (vírgula ou ponto e vírgula; UTF-8 ou
+Windows-1252) na importação e exporta nos dois formatos.
+
+- `exceljs` (servidor): `buildTemplate` gera o modelo com aba "Instruções"
+  (o que preencher, obrigatória, exemplo), cabeçalhos coloridos (laranja =
+  obrigatória), nota por coluna e **listas suspensas** (tipo, UF…);
+  `buildExport` usa o mesmo formato (exportar → editar → importar de volta),
+  tudo como texto para o Excel não comer zeros à esquerda; `readSheet` mapeia
+  cabeçalhos tolerando acento/caixa/`*`/sinônimos e a chave antiga em inglês.
+- Limites: 5 MB e 5.000 linhas por arquivo; erros amigáveis (formato,
+  arquivo corrompido/protegido, coluna obrigatória ausente).
+- `SpreadsheetImportWizard`: 1) baixar modelo, 2) preencher, 3) enviar →
+  **prévia** (prontos / já existem / com problema, com a linha e o motivo)
+  → confirmar. Nada grava antes da confirmação. Duplicados: pular ou
+  atualizar. `SpreadsheetMenu`: botão "Planilha" das listas.
+- Stateless: a confirmação reenvia o arquivo e o servidor revalida tudo (não
+  confia na prévia do cliente).
+- `core/csv.ts#parseCsv` ganhou o parâmetro `delimiter`.
