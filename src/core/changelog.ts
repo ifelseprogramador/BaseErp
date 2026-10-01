@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.0",
+    date: "2026-09-30",
+    changes: [
+      {
+        type: "novo",
+        text: 'Em Perfil › "Dados da empresa", o responsável pela conta agora edita o nome que aparece nos documentos enviados ao cliente, além de CNPJ/CPF, telefone e endereço.',
+      },
+    ],
+  },
+  {
     version: "0.4.2",
     date: "2026-09-30",
     changes: [

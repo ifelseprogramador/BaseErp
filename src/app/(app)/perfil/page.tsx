@@ -8,6 +8,7 @@ import { DisplayNameForm } from "@/core/profile/components/display-name-form";
 import { ChangePasswordForm } from "@/core/profile/components/change-password-form";
 import { ThemeToggle } from "@/core/profile/components/theme-toggle";
 import { BrandingForm } from "@/core/profile/components/branding-form";
+import { CompanyForm } from "@/core/profile/components/company-form";
 
 export default async function ProfilePage() {
   const [user, { role, organizationId, withDb }] = await Promise.all([getSession(), withOrg()]);
@@ -18,6 +19,11 @@ export default async function ProfilePage() {
         primaryColor: organizations.primaryColor,
         sidebarColor: organizations.sidebarColor,
         logoUrl: organizations.logoUrl,
+        name: organizations.name,
+        displayName: organizations.displayName,
+        document: organizations.document,
+        phone: organizations.phone,
+        address: organizations.address,
       })
       .from(organizations)
       .where(eq(organizations.id, organizationId))
@@ -49,6 +55,25 @@ export default async function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {role === "owner" && org && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Dados da empresa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CompanyForm
+              initial={{
+                accountName: org.name,
+                displayName: org.displayName,
+                document: org.document,
+                phone: org.phone,
+                address: org.address,
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {role === "owner" && (
         <Card>

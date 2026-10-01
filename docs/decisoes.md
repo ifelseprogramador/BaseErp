@@ -714,3 +714,16 @@ Windows-1252) na importação e exporta nos dois formatos.
 - Stateless: a confirmação reenvia o arquivo e o servidor revalida tudo (não
   confia na prévia do cliente).
 - `core/csv.ts#parseCsv` ganhou o parâmetro `delimiter`.
+
+## 2026-09-30 — Dados da empresa editáveis pelo dono da conta
+
+Os documentos compartilhados (`core/share`) usam o nome/CNPJ/telefone/endereço
+da organização, mas o gatilho `restrict_organization_branding_update` impedia o
+dono da CONTA de editá-los (só o dono da plataforma). Mudança:
+`organizations.display_name` (novo, "Nome nos documentos"; vazio = usa `name`)
+e a migration `0008_company_profile_owner_update.sql` recria o gatilho
+liberando `display_name`, `document`, `phone` e `address` para o dono da conta.
+Continuam restritos ao dono da plataforma: `name`, ramo, status e cobrança.
+UI: card "Dados da empresa" em Perfil (`core/profile/components/company-form.tsx`,
+`core/profile/company-actions.ts`, só `role === "owner"`). Cada vertical aplica
+a migration e passa a ler `displayName ?? name` nos documentos.

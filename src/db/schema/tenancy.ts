@@ -31,6 +31,10 @@ export const billingStatusEnum = pgEnum("billing_status", ["em_dia", "atrasado",
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  // Nome que aparece nos documentos enviados ao cliente (PDF, link, mensagem).
+  // Editável pelo dono da conta; vazio = usa `name` (nome da conta, controlado
+  // pelo dono da plataforma).
+  displayName: text("display_name"),
   document: text("document"), // CNPJ ou CPF da organização
   phone: text("phone"),
   address: text("address"),
