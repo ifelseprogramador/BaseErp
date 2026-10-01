@@ -30,6 +30,7 @@ import { Hint } from "@/components/hint";
 import { sendShareByEmail } from "@/core/share/actions";
 import type { ShareLinkResult } from "@/core/share/create";
 import { SHARE_VARS, renderShareTemplate } from "@/core/share/template";
+import { formatPhoneBr, whatsappLink } from "@/core/contact-links";
 
 const TEMPLATE_KEY = (kind?: string) => `share-template:${kind ?? "outro"}`;
 
@@ -40,13 +41,6 @@ function loadSavedTemplate(kind?: string): string | null {
   } catch {
     return null;
   }
-}
-
-/** wa.me exige DDI: assume Brasil (55) quando o número tem 10 ou 11 dígitos. */
-function whatsappUrl(phone: string | undefined, text: string) {
-  const digits = (phone ?? "").replace(/\D/g, "");
-  const full = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
-  return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
 }
 
 function BrandIcon({ icon }: { icon: { path: string } }) {
@@ -88,13 +82,6 @@ function ChannelLink({
       </span>
     </a>
   );
-}
-
-function formatPhoneLabel(phone?: string) {
-  const d = (phone ?? "").replace(/\D/g, "");
-  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return d || undefined;
 }
 
 /**
@@ -190,7 +177,7 @@ export function ShareDocumentButton({
   }
 
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
-  const phoneLabel = formatPhoneLabel(result?.recipient?.phone);
+  const phoneLabel = formatPhoneBr(result?.recipient?.phone) || undefined;
 
   return (
     <>
@@ -291,7 +278,7 @@ export function ShareDocumentButton({
                   </button>
                 )}
                 <ChannelLink
-                  href={whatsappUrl(result.recipient?.phone, text)}
+                  href={whatsappLink(result.recipient?.phone, text)}
                   color={`#${siWhatsapp.hex}`}
                   textColor="#06290f"
                   icon={<BrandIcon icon={siWhatsapp} />}
