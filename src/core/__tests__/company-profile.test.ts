@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { companyProfileSchema } from "../profile/company-actions";
+import { companyProfileSchema } from "../profile/company-validation";
 
 describe("companyProfileSchema", () => {
   it("campos vazios viram null (limpar um dado é permitido)", () => {
