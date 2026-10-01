@@ -73,6 +73,7 @@ FOUNDATION_PATHS=(
   "src/components/confirm-delete-button.tsx"
   "src/components/hint.tsx"
   "src/components/share-document-button.tsx"
+  "src/components/entity-header.tsx"
   "src/components/spreadsheet-import-wizard.tsx"
   "src/components/spreadsheet-menu.tsx"
   "src/components/row-actions.tsx"
