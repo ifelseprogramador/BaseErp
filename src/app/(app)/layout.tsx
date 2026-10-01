@@ -91,13 +91,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <div className="flex flex-1">
         <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex print:hidden">
-          <div className="border-sidebar-border flex items-center gap-2 border-b px-4 py-3.5">
+          <div className="border-sidebar-border flex min-h-16 items-center gap-2 border-b px-4 py-3">
             {org.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- URL dinâmica do Supabase Storage, fora do domínio de imagens do Next.
               <img
                 src={org.logoUrl}
                 alt={org.organizationName}
-                className="h-6 w-auto object-contain"
+                className="h-12 w-auto max-w-full object-contain object-left"
               />
             ) : (
               <>
