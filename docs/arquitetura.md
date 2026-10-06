@@ -96,6 +96,21 @@ altera. `/equipe` recusa e-mail que já tem cadastro no Supabase Auth, para
 o dono da conta nunca "adotar" (e resetar a senha de) alguém de outra
 empresa.
 
+### Auditoria de negócio e histórico de status
+
+- **Quem criou/alterou:** `auditColumns` (`db/schema/audit.ts`: `createdBy`,
+  `updatedBy`) espalhado nas colunas de cada tabela de módulo + gatilho
+  `select public.apply_audit_columns('tabela');` na migration custom do módulo.
+  Quem preenche é o BANCO (`set_audit_columns()`, lendo `app.current_user_id`),
+  não cada action: um insert/update esquecido ainda sai com autoria, e a sessão
+  sempre vence um `created_by` forjado. Sem sessão (cron, seed) fica nulo.
+- **Quem mudou o status:** `status_history` + `core/status-history.ts#recordStatusChange`,
+  chamado na MESMA transação do `UPDATE` de status. Ninguém edita nem apaga
+  (RLS sem policy de update/delete para membros).
+- **Mostrar:** `<AuditStamp>` (rodapé da ficha) e `<StatusTimeline>` — só
+  aparecem em empresa multiusuário. Nomes vêm de `get_user_display_info`, que
+  serve qualquer membro da organização (só gente das organizações do chamador).
+
 ## RLS (Row-Level Security)
 
 **Migrations custom em SQL puro**, em `src/db/migrations-custom/`,

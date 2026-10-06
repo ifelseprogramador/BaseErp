@@ -785,3 +785,26 @@ módulos). Verticais precisam aplicar a migration, trocar `withOrg()` por
 - `components/module-guard.tsx`: casca de UX para o `layout.tsx` de cada módulo
   (aviso "Sem acesso" em vez de erro). **Não é a proteção** — essa é
   `requireModule()` em toda Server Action, consulta e rota do módulo.
+
+## 2026-10-06 — Auditoria de negócio e histórico de status
+
+**Problema:** com várias pessoas na mesma empresa, nenhuma tabela de negócio
+dizia quem criou ou alterou algo, nem quem mudou o status de uma OS/pedido.
+
+**Decisões:**
+
+- Autoria por GATILHO (`set_audit_columns`), não por código nas actions: é a
+  mesma ideia da RLS — falha fechado por padrão, ninguém precisa lembrar. A
+  sessão (`app.current_user_id`) sempre vence o valor enviado.
+- Sem FK para `auth.users`: apagar uma conta não pode apagar nem travar o
+  histórico. A tela mostra "Usuário removido" quando o nome some.
+- `status_history` é genérica (`entity_table` + `entity_id`), uma tabela para
+  todos os módulos, imutável para membros.
+- `get_user_display_info` ampliada: antes só admin/dono da conta; agora qualquer
+  membro enxerga nome/e-mail de colegas da MESMA organização (necessário para
+  "criado por Fulano"). Nunca de outra organização.
+- Infra no BaseERP (migration drizzle `0006_audit_status_history`, custom
+  `0010_audit_columns_and_status_history`); aplicada às tabelas de cada vertical
+  nas migrations deles. Validado num Postgres em memória (11 cenários: autoria
+  forjada, update por outra pessoa, histórico imutável, isolamento entre
+  organizações, nomes entre colegas).
