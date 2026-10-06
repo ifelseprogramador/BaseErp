@@ -10,7 +10,7 @@ import type { eventWithTime } from "@rrweb/types";
 // um do tamanho da tela gravada (ex.: 720px) — empurrando o conteúdo real
 // para fora da janela visível. Era a causa do "só aparece fundo cinza".
 import "rrweb/dist/style.css";
-import { Maximize2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, RefreshCw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { logger } from "@/core/logger";
@@ -243,6 +243,20 @@ export function LiveSessionViewer({
     }
     void pollSnapshot();
 
+    // O usuário gravou um quadro completo NOVO (ele reenvia um depois que a
+    // tela assenta, e a pedido do botão "Atualizar tela"): recria o espelho a
+    // partir dele. Cura qualquer descompasso — por exemplo o aviso de
+    // consentimento que ainda estava na tela no primeiro quadro.
+    function resync() {
+      if (!replayerRef.current) return; // ainda nem criou: o polling já pega o novo
+      replayerRef.current.destroy();
+      replayerRef.current = null;
+      fetchedSnapshotRef.current = null;
+      pendingEventsRef.current = [];
+      pollAttempts = 0;
+      void pollSnapshot();
+    }
+
     channel
       .on("broadcast", { event: "status" }, ({ payload }) => {
         const next = payload.status as string;
@@ -257,6 +271,9 @@ export function LiveSessionViewer({
       })
       .on("broadcast", { event: "message" }, ({ payload }) => {
         dispatchChatMessage(sessionId, payload as ChatMessageDto);
+      })
+      .on("broadcast", { event: "resync" }, () => {
+        resync();
       })
       .on("broadcast", { event: "rrweb" }, ({ payload }) => {
         const event = payload as eventWithTime;
@@ -468,6 +485,23 @@ export function LiveSessionViewer({
               <Maximize2 className="h-4 w-4" />
             </Button>
           </div>
+        )}
+        {status === "active" && (
+          <Button
+            variant="outline"
+            size="sm"
+            title="Pede à pessoa um quadro novo da tela, se o espelho parecer travado ou desatualizado"
+            onClick={() =>
+              void channelRef.current?.send({
+                type: "broadcast",
+                event: "request-snapshot",
+                payload: {},
+              })
+            }
+          >
+            <RefreshCw className="h-4 w-4" />
+            Atualizar tela
+          </Button>
         )}
         <Button variant="destructive" size="sm" onClick={handleEnd} disabled={isPending}>
           <X className="h-4 w-4" />

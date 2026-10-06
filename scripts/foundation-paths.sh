@@ -52,6 +52,7 @@ FOUNDATION_PATHS=(
   "src/core/live-support/wait.ts"
   "src/core/live-support/chat-events.ts"
   "src/core/live-support/components/support-chat.tsx"
+  "src/core/live-support/components/draggable-panel.tsx"
   "src/core/live-support/__tests__/wait.test.ts"
   "src/core/__tests__/telegram.test.ts"
   "src/core/admin/components/support-requests.ts"

@@ -855,3 +855,27 @@ Migrations: drizzle `0007_live_support_per_user`, custom
 `0011_live_support_per_user`. Validado num Postgres em memória (28 cenários de
 RLS/presença/configuração) e 15 testes unitários (espera, expiração, alerta,
 chat, Telegram).
+
+## 2026-10-06 — Espelho do suporte: segundo quadro, "Atualizar tela" e caixa arrastável
+
+**Bug:** depois de a pessoa clicar em "Permitir", o espelho do suporte ficava
+preso no aviso "quer ver sua tela". A gravação (rrweb) começa no instante do
+clique, com o aviso ainda saindo (animação de saída) — o primeiro quadro já
+inclui o aviso. A remoção dele chega logo depois pelo Broadcast, mas o viewer
+DESCARTA de propósito os eventos anteriores ao quadro que buscou no banco
+(aplicar mutação velha sobre quadro novo corrompe o espelho). Resultado: o aviso
+nunca saía. (O "efeito espelhado" nas laterais da imagem é só o
+`backdrop-blur` do aviso, que reflete as bordas.)
+
+**Correção:** o widget tira um SEGUNDO quadro completo 1,5 s depois do início
+(`record.takeFullSnapshot()`), grava e avisa o viewer (`resync`), que recria o
+espelho a partir dele. Mesmo caminho serve ao botão "Atualizar tela" do admin
+(`request-snapshot` → a pessoa tira e grava um quadro novo → `resync`) para
+qualquer outro descompasso. Só quadros DEPOIS do primeiro disparam `resync`
+(o primeiro o viewer já busca sozinho).
+
+**Caixa de conversa arrastável** (`draggable-panel.tsx`): pointer events com
+captura (mouse e toque), setas do teclado na barra, nunca sai da janela
+(re-ajusta ao redimensionar e ao recolher/expandir). Sem persistência entre
+recarregamentos, de propósito (ler `localStorage` na renderização causa
+diferença entre servidor e navegador).

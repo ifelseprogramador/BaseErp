@@ -24,6 +24,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.1",
+    date: "2026-10-06",
+    changes: [
+      {
+        type: "correcao",
+        text: 'Na tela compartilhada com o suporte, o aviso de permissão não fica mais preso no espelho depois que você clica em Permitir. O suporte também ganhou o botão "Atualizar tela" para renovar a imagem se ela parecer travada.',
+      },
+      {
+        type: "melhoria",
+        text: "A caixa de conversa com o suporte agora pode ser arrastada para qualquer lugar da tela (com o mouse, o dedo ou as setas do teclado).",
+      },
+    ],
+  },
+  {
     version: "0.7.0",
     date: "2026-10-06",
     changes: [

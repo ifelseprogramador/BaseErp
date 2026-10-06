@@ -18,6 +18,7 @@ import { logger } from "@/core/logger";
 import { getRealtimeChannel, liveSessionChannelName, userSupportChannelName } from "../realtime";
 import { dispatchChatMessage } from "../chat-events";
 import { SupportChat } from "./support-chat";
+import { DraggablePanel } from "./draggable-panel";
 import { applyControlEvent } from "../apply-control-event";
 import type { ControlEvent } from "../control-events";
 import {
@@ -68,6 +69,8 @@ export function LiveSupportWidget({
   const [isPending, startTransition] = useTransition();
   const sessionRef = useRef(session);
   const stopRecordingRef = useRef<(() => void) | null>(null);
+  // Tira um NOVO quadro completo da tela (ver `resnapshot` na gravação abaixo).
+  const takeSnapshotRef = useRef<(() => void) | null>(null);
   const cursorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -116,6 +119,9 @@ export function LiveSupportWidget({
       })
       .on("broadcast", { event: "message" }, ({ payload }) => {
         dispatchChatMessage(session.id, payload as ChatMessageDto);
+      })
+      .on("broadcast", { event: "request-snapshot" }, () => {
+        takeSnapshotRef.current?.();
       })
       .on("broadcast", { event: "control-input" }, ({ payload }) => {
         if (sessionRef.current?.controlGranted) {
@@ -195,6 +201,7 @@ export function LiveSupportWidget({
       import("rrweb").then(({ record, EventType }) => {
         if (cancelled) return;
         let lastMeta: eventWithTime | null = null;
+        let snapshotsSent = 0;
         const stop = record({
           emit(event: eventWithTime) {
             if (event.type === EventType.Meta) {
@@ -218,10 +225,19 @@ export function LiveSupportWidget({
               // abaixo. Por isso vai persistido via Server Action (o admin
               // busca sob demanda), nunca pelo Broadcast. Só os eventos
               // incrementais (poucas centenas de bytes cada) vão por aqui.
+              snapshotsSent += 1;
+              const isRefresh = snapshotsSent > 1;
               void saveFullSnapshot(session.id, { meta: lastMeta, snapshot: event }).then(
                 (result) => {
                   if (!result.ok) {
                     logger.error("live_support.snapshot_falhou", { sessionId: session.id });
+                    return;
+                  }
+                  // Quadro NOVO (não o primeiro) já gravado: o viewer do admin
+                  // recria o espelho a partir dele. O primeiro dispensa o aviso
+                  // — o viewer já o busca sozinho (polling).
+                  if (isRefresh) {
+                    void channel.send({ type: "broadcast", event: "resync", payload: {} });
                   }
                 },
               );
@@ -231,6 +247,17 @@ export function LiveSupportWidget({
           },
         });
         stopRecordingRef.current = stop ?? null;
+        takeSnapshotRef.current = () => record.takeFullSnapshot();
+        // Segundo quadro completo, depois que a tela assenta. O primeiro sai
+        // no instante em que a pessoa clica em "Permitir" — com o próprio
+        // aviso "quer ver sua tela" ainda na tela, saindo (animação de
+        // saída). A remoção dele chega logo depois pelo Broadcast, mas o
+        // viewer DESCARTA de propósito os eventos anteriores ao quadro que ele
+        // buscou (ver `live-session-viewer.tsx`), então o aviso ficava preso
+        // no espelho do suporte. Um quadro novo sem ele corrige isso.
+        setTimeout(() => {
+          if (!cancelled) takeSnapshotRef.current?.();
+        }, 1500);
       });
       return () => {
         cancelled = true;
@@ -239,6 +266,7 @@ export function LiveSupportWidget({
     if (session?.status !== "active" && stopRecordingRef.current) {
       stopRecordingRef.current();
       stopRecordingRef.current = null;
+      takeSnapshotRef.current = null;
     }
   }, [session]);
 
@@ -416,21 +444,29 @@ export function LiveSupportWidget({
       )}
 
       {session?.status === "active" && (
-        <div className="bg-card fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border p-3 shadow-lg">
-          <button
-            type="button"
-            onClick={() => setChatOpen((open) => !open)}
-            className="flex items-center justify-between text-sm font-medium"
-            aria-expanded={chatOpen}
-          >
-            <span className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Conversa com o suporte
-            </span>
-            {chatOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </button>
+        <DraggablePanel
+          className="bg-card fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border p-3 shadow-lg"
+          header={
+            <div className="flex items-center justify-between gap-2 text-sm font-medium">
+              <span className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Conversa com o suporte
+              </span>
+              <button
+                type="button"
+                data-no-drag
+                onClick={() => setChatOpen((open) => !open)}
+                aria-expanded={chatOpen}
+                aria-label={chatOpen ? "Recolher conversa" : "Expandir conversa"}
+                className="hover:bg-muted rounded p-0.5"
+              >
+                {chatOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </button>
+            </div>
+          }
+        >
           {chatOpen && <SupportChat sessionId={session.id} side="user" />}
-        </div>
+        </DraggablePanel>
       )}
 
       {session?.status === "active" && session.controlGranted && (
