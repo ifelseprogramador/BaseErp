@@ -40,6 +40,13 @@
 # LGPD, que o BaseERP nem tem módulo pra ter).
 FOUNDATION_PATHS=(
   "src/core/auth.ts"
+  "src/core/module-access.ts"
+  "src/core/temp-password.ts"
+  "src/core/team"
+  "src/core/admin/components/seats-form.tsx"
+  "src/core/__tests__/module-access.test.ts"
+  "src/components/module-guard.tsx"
+  "src/app/(app)/equipe"
   "src/core/backup.ts"
   "src/core/db.ts"
   "src/core/admin-auth.ts"
@@ -114,6 +121,10 @@ FOUNDATION_EXCLUDE_PATHS=(
 # PRA NEM DE aquele vertical em particular. Chave = nome da pasta do
 # vertical (basename do caminho em verticals.txt).
 #
+# mecano-erp (multiusuário): `core/team/actions.ts` diverge de propósito —
+# o `recordAudit` do Mecano não recebe `db` (abre a própria transação), as
+# demais assinaturas do BaseERP/Prisma não servem lá.
+#
 # mecano-erp: `stale-service-worker-cleanup.tsx` desregistra QUALQUER
 # service worker encontrado — seguro no BaseERP/Prisma, que não têm
 # nenhum de verdade, mas destruiria o service worker real do mecano-erp
@@ -125,7 +136,7 @@ FOUNDATION_EXCLUDE_PATHS=(
 # aconteceu aqui (commit de reconciliação vazou "oficina" pro BaseERP
 # via sync reverso antes desta exceção existir, revertido na hora).
 declare -A VERTICAL_PATH_EXCLUDES=(
-  [mecano-erp]="src/components/stale-service-worker-cleanup.tsx src/app/layout.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx src/app/(app)/perfil/page.tsx src/app/(auth)/login/page.tsx src/db/schema/tenancy.ts src/core/admin/validation.ts src/core/profile/actions.ts"
+  [mecano-erp]="src/components/stale-service-worker-cleanup.tsx src/app/layout.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx src/app/(app)/perfil/page.tsx src/app/(auth)/login/page.tsx src/db/schema/tenancy.ts src/core/admin/validation.ts src/core/profile/actions.ts src/core/team/actions.ts"
 )
 
 is_vertical_excluded() {
