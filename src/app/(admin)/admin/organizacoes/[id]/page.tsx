@@ -8,11 +8,13 @@ import {
   hardDeleteOrganization,
   updateBilling,
   updateOrganizationName,
+  updateSeats,
 } from "@/core/admin/actions";
 import { OrganizationNameForm } from "@/core/admin/components/organization-name-form";
 import { OrgStatusToggle } from "@/core/admin/components/org-status-toggle";
 import { ImpersonateButton } from "@/core/admin/components/impersonate-button";
 import { BillingForm } from "@/core/admin/components/billing-form";
+import { SeatsForm } from "@/core/admin/components/seats-form";
 import { ModuleToggleList } from "@/core/admin/components/module-toggle-list";
 import { HardDeleteForm } from "@/core/admin/components/hard-delete-form";
 import { ResetMemberPasswordButton } from "@/core/admin/components/reset-member-password-button";
@@ -39,6 +41,8 @@ export default async function AdminOrganizationDetailPage({
   const updateBillingWithId = updateBilling.bind(null, org.id);
   const hardDeleteWithId = hardDeleteOrganization.bind(null, org.id);
   const updateNameWithId = updateOrganizationName.bind(null, org.id);
+  const updateSeatsWithId = updateSeats.bind(null, org.id);
+  const activeCount = members.filter((m) => m.active).length;
 
   const overrideBySlug = new Map(moduleSettings.map((m) => [m.moduleSlug, m.enabled]));
   const modules = getAllModules().map((m) => ({
@@ -62,6 +66,9 @@ export default async function AdminOrganizationDetailPage({
                 {org.status === "blocked" ? "Bloqueada" : "Ativa"}
               </Badge>
               {org.businessType && <Badge variant="outline">{org.businessType}</Badge>}
+              <Badge variant="outline">
+                {org.multiUser ? `Multiusuário (${activeCount}/${org.seatLimit})` : "1 usuário"}
+              </Badge>
             </div>
           </div>
         </div>
@@ -94,6 +101,21 @@ export default async function AdminOrganizationDetailPage({
             nextDueDate={org.nextDueDate}
             billingNotes={org.billingNotes}
             action={updateBillingWithId}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Usuários</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SeatsForm
+            multiUser={org.multiUser}
+            seatLimit={org.seatLimit}
+            extraSeatPriceCents={org.extraSeatPriceCents}
+            activeCount={activeCount}
+            action={updateSeatsWithId}
           />
         </CardContent>
       </Card>

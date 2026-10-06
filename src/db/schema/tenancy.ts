@@ -6,6 +6,7 @@ import {
   timestamp,
   date,
   boolean,
+  integer,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -74,6 +75,18 @@ export const organizations = pgTable("organizations", {
   nextDueDate: date("next_due_date"),
   billingNotes: text("billing_notes"),
 
+  // Multiusuário — liberado SÓ pelo dono da plataforma (área /admin; o
+  // trigger `restrict_organization_branding_update` impede o dono da
+  // conta de alterar). `multiUser = false` (padrão) = empresa de uma
+  // pessoa só: sem tela de equipe, sem convite. `true` = o dono da conta
+  // pode convidar até `seatLimit` pessoas ATIVAS (contando ele mesmo).
+  // `extraSeatPriceCents` é só informativo (valor do usuário extra, para
+  // o dono da plataforma lembrar o que combinou) — nenhuma cobrança
+  // automática lê isso.
+  multiUser: boolean("multi_user").notNull().default(false),
+  seatLimit: integer("seat_limit").notNull().default(1),
+  extraSeatPriceCents: integer("extra_seat_price_cents"),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -96,9 +109,41 @@ export const memberships = pgTable(
     // sem bloquear a organização inteira — diferente de
     // organizations.status, que bloqueia todo mundo daquela organização.
     active: boolean("active").notNull().default(true),
+    // Quem convidou (dono da conta) e quando — null para o dono criado
+    // pelo admin da plataforma.
+    invitedBy: uuid("invited_by"),
+    invitedAt: timestamp("invited_at", { withTimezone: true }),
+    // Setor da pessoa (texto livre, ex.: "Oficina", "Financeiro") — só
+    // organização visual na tela de equipe, não controla acesso (quem
+    // controla é `membership_modules`).
+    department: text("department"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("memberships_user_org_unique").on(table.userId, table.organizationId)],
+);
+
+/**
+ * Quais módulos cada pessoa (`staff`) pode acessar — escolhido pelo dono
+ * da conta em `/equipe`, sempre dentro dos módulos que a organização tem
+ * habilitados (`organization_module_settings`). O `owner` não precisa de
+ * linhas aqui: acessa tudo. Sem linha = sem acesso àquele módulo.
+ * `organizationId` fica redundante de propósito (RLS por organização sem
+ * join) — ver migrations-custom/0009_multiuser_team.sql.
+ */
+export const membershipModules = pgTable(
+  "membership_modules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    moduleSlug: text("module_slug").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("membership_modules_unique").on(table.membershipId, table.moduleSlug)],
 );
 
 /**

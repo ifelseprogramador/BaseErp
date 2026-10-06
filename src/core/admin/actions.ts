@@ -3,12 +3,13 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireAdmin } from "@/core/admin-auth";
 import { createSupabaseAdminClient } from "@/core/supabase/admin";
 import { recordAudit } from "./audit";
 import { IMPERSONATION_COOKIE, IMPERSONATION_MAX_AGE_SECONDS } from "@/core/impersonation";
 import type { ActionResult } from "@/core/action-result";
+import { generateTemporaryPassword } from "@/core/temp-password";
 import {
   auditLog,
   memberships,
@@ -21,6 +22,7 @@ import {
   parseNewOrganizationFormData,
   parseOrganizationNameFormData,
 } from "./validation";
+import { parseSeatsFormData } from "@/core/team/validation";
 
 /**
  * Modo suporte: o admin passa a acessar `/` (o app) como se fosse o dono
@@ -225,6 +227,74 @@ export async function updateBilling(
     return { ok: true };
   } catch (err) {
     log.error("admin.organizacao.cobranca.falhou", { organizationId, err });
+    return { ok: false, message: "Não foi possível salvar. Tente novamente." };
+  }
+}
+
+/**
+ * Libera (ou tira) o modo multiusuário de uma organização e define quantas
+ * pessoas ATIVAS ela pode ter (contando o dono). Só o dono da plataforma
+ * decide isso — o dono da conta só convida dentro do limite (ver
+ * `core/team/actions.ts`). Não deixa baixar o limite abaixo de quem já está
+ * ativo: o admin precisa pedir pra desativar gente antes.
+ */
+export async function updateSeats(
+  organizationId: string,
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { userId, log, withDb } = await requireAdmin();
+
+  const parsed = parseSeatsFormData(formData);
+  if (!parsed.success) {
+    return { ok: false, errors: parsed.error.flatten().fieldErrors };
+  }
+  const { multiUser, seatLimit, extraSeatPriceCents } = parsed.data;
+  log.info("admin.organizacao.assentos", { organizationId, multiUser, seatLimit });
+
+  try {
+    const activeMembers = await withDb((db) =>
+      db
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(and(eq(memberships.organizationId, organizationId), eq(memberships.active, true))),
+    );
+
+    if (activeMembers.length > seatLimit) {
+      return {
+        ok: false,
+        errors: {
+          seatLimit: [
+            `Há ${activeMembers.length} pessoas ativas — desative até chegar em ${seatLimit} antes de reduzir o limite.`,
+          ],
+        },
+      };
+    }
+
+    const updated = await withDb((db) =>
+      db
+        .update(organizations)
+        .set({ multiUser, seatLimit, extraSeatPriceCents, updatedAt: new Date() })
+        .where(eq(organizations.id, organizationId))
+        .returning({ id: organizations.id }),
+    );
+    if (updated.length === 0) {
+      return { ok: false, message: "Organização não encontrada." };
+    }
+
+    await withDb((db) =>
+      recordAudit(db, {
+        actorUserId: userId,
+        organizationId,
+        action: "organizacao.assentos",
+        metadata: { multiUser, seatLimit, extraSeatPriceCents },
+      }),
+    );
+    revalidatePath(`/admin/organizacoes/${organizationId}`);
+    revalidatePath("/equipe");
+    return { ok: true };
+  } catch (err) {
+    log.error("admin.organizacao.assentos.falhou", { organizationId, err });
     return { ok: false, message: "Não foi possível salvar. Tente novamente." };
   }
 }
@@ -456,18 +526,6 @@ export async function clearAuditLogForOrg(organizationId: string): Promise<Actio
     log.error("admin.auditoria.limpar.falhou", { organizationId, err });
     return { ok: false, message: "Não foi possível limpar o histórico. Tente novamente." };
   }
-}
-
-/** Letras/dígitos sem caracteres ambíguos (0/O, 1/l/I) — pensado pra ser
- * digitado/ditado por telefone quando o admin repassa pro usuário. */
-const TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-
-function generateTemporaryPassword(length = 12): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => TEMP_PASSWORD_ALPHABET[b % TEMP_PASSWORD_ALPHABET.length]).join(
-    "",
-  );
 }
 
 export interface ResetMemberPasswordResult extends ActionResult {

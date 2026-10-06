@@ -738,3 +738,36 @@ mais de 7 dias (`core/share/purge.ts`). Mesma proteção do backup
 "expirado" distinguível de "inexistente" por um tempo e dá margem para
 suporte. Backups (`organization_backups`) podem conter o snapshot até a
 própria rotação.
+
+## 2026-10-05 — Multiusuário por organização (mono/multi + módulos por pessoa)
+
+**Problema:** todos os verticais eram mono-usuário na prática — o schema
+aceitava várias linhas em `memberships`, mas não havia convite, limite de
+assentos nem controle do que cada pessoa pode abrir. Objetivo comercial:
+vender para pequenas/médias empresas, umas com 1 usuário, outras com vários
+usuários e setores, cobrando por empresa.
+
+**Decisões:**
+
+- Dois níveis: o dono da PLATAFORMA libera mono/multi e o limite de pessoas
+  (`organizations.multi_user`, `seat_limit`); o dono da CONTA convida e escolhe
+  módulos por pessoa. Preço (usuário extra) é decisão comercial fora do
+  sistema — `extra_seat_price_cents` é só lembrete.
+- Permissão por módulo (ver/não ver), não por papel nem por ação. Evolução
+  possível: leitura vs. edição por módulo, se algum cliente pedir.
+- A checagem é dupla: Server Action (mensagem amigável) + banco (trigger de
+  assentos, policies de owner, RLS ignora membership desativado).
+- Convite = criar conta com senha provisória devolvida uma vez (mesmo padrão
+  do reset do admin). Sem e-mail transacional. Recusa e-mail já cadastrado.
+- `getActiveOrg` separou a leitura de `memberships` da de `organizations`:
+  quem foi desativado só enxerga a PRÓPRIA linha (`memberships_select_self`) e
+  continua vendo "acesso bloqueado" em vez de "sem organização".
+- `get_user_display_info` passou a servir também o dono da conta, só para
+  membros de organizações dele (antes: só platform admin).
+
+**Não coberto aqui (próximos passos):** auditoria de negócio (`created_by`/
+`updated_by` nas tabelas de módulo), concorrência de edição nos módulos de
+cada vertical, e `requireModule` dentro de cada módulo (este template não tem
+módulos). Verticais precisam aplicar a migration, trocar `withOrg()` por
+`requireModule(slug)` e acrescentar `membership_modules` ao
+`hardDeleteOrganization` se não usarem cascade.

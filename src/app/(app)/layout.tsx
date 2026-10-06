@@ -1,7 +1,7 @@
 import "@/core/load-modules";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LogOut, Headset, User } from "lucide-react";
+import { LogOut, Headset, User, Users } from "lucide-react";
 import {
   getActiveOrg,
   getSession,
@@ -12,6 +12,7 @@ import {
   UnauthorizedError,
 } from "@/core/auth";
 import { getEnabledModulesForOrg } from "@/core/module-settings";
+import { filterModulesByAccess } from "@/core/module-access";
 import { stopImpersonation } from "@/core/admin/actions";
 import { getOpenSessionForMyOrg } from "@/core/live-support/queries";
 import { LiveSupportWidget } from "@/core/live-support/components/live-support-widget";
@@ -63,7 +64,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     (user?.user_metadata?.display_name as string | undefined) ?? org.organizationName;
 
   const { withDb } = await withOrg();
-  const modules = await withDb((tx) => getEnabledModulesForOrg(tx, org.organizationId));
+  // Menu só com o que esta pessoa pode abrir (o dono da conta escolhe em
+  // /equipe). Esconder não é a proteção — cada módulo chama `requireModule`.
+  const modules = filterModulesByAccess(
+    await withDb((tx) => getEnabledModulesForOrg(tx, org.organizationId)),
+    org.moduleAccess,
+  );
   const stopImpersonationWithId = stopImpersonation.bind(null, org.organizationId);
 
   // Nunca durante modo suporte: quem está "usando" a organização ali é o
@@ -143,6 +149,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     <User className="h-4 w-4" />
                     Perfil
                   </DropdownMenuItem>
+                  {org.role === "owner" && org.multiUser && (
+                    <DropdownMenuItem render={<Link href="/equipe" />}>
+                      <Users className="h-4 w-4" />
+                      Equipe
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               <form action={logout}>

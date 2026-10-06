@@ -24,6 +24,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.6.0",
+    date: "2026-10-05",
+    changes: [
+      {
+        type: "novo",
+        text: 'Empresas com o modo "vários usuários" liberado ganham a tela Equipe (menu da sua conta): o responsável adiciona pessoas, define o setor de cada uma e escolhe quais módulos ela pode abrir.',
+      },
+      {
+        type: "melhoria",
+        text: "Quem é desativado na Equipe perde o acesso na hora, e o lugar dele fica livre para outra pessoa.",
+      },
+    ],
+  },
+  {
     version: "0.5.1",
     date: "2026-10-01",
     changes: [
