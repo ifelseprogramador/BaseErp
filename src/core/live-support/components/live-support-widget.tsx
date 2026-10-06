@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { eventWithTime } from "@rrweb/types";
 import { toast } from "sonner";
-import { ChevronDown, ChevronUp, Headset, MessageSquare, WifiOff, X } from "lucide-react";
+import { Headset, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -17,8 +17,7 @@ import {
 import { logger } from "@/core/logger";
 import { getRealtimeChannel, liveSessionChannelName, userSupportChannelName } from "../realtime";
 import { dispatchChatMessage } from "../chat-events";
-import { SupportChat } from "./support-chat";
-import { DraggablePanel } from "./draggable-panel";
+import { SupportChatPanel } from "./support-chat-panel";
 import { applyControlEvent } from "../apply-control-event";
 import type { ControlEvent } from "../control-events";
 import {
@@ -65,7 +64,6 @@ export function LiveSupportWidget({
   const [session, setSession] = useState<LiveSessionState | null>(initialSession);
   const [notice, setNotice] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [chatOpen, setChatOpen] = useState(true);
   const [isPending, startTransition] = useTransition();
   const sessionRef = useRef(session);
   const stopRecordingRef = useRef<(() => void) | null>(null);
@@ -443,31 +441,7 @@ export function LiveSupportWidget({
         </div>
       )}
 
-      {session?.status === "active" && (
-        <DraggablePanel
-          className="bg-card fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border p-3 shadow-lg"
-          header={
-            <div className="flex items-center justify-between gap-2 text-sm font-medium">
-              <span className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Conversa com o suporte
-              </span>
-              <button
-                type="button"
-                data-no-drag
-                onClick={() => setChatOpen((open) => !open)}
-                aria-expanded={chatOpen}
-                aria-label={chatOpen ? "Recolher conversa" : "Expandir conversa"}
-                className="hover:bg-muted rounded p-0.5"
-              >
-                {chatOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              </button>
-            </div>
-          }
-        >
-          {chatOpen && <SupportChat sessionId={session.id} side="user" />}
-        </DraggablePanel>
-      )}
+      {session?.status === "active" && <SupportChatPanel sessionId={session.id} side="user" />}
 
       {session?.status === "active" && session.controlGranted && (
         <div

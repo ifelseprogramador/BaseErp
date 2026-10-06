@@ -29,22 +29,41 @@ export function SupportChat({
   sessionId,
   side,
   className,
+  onIncoming,
 }: {
   sessionId: string;
   side: "admin" | "user";
   className?: string;
+  /** Chamada quando a RELEITURA periódica descobre mensagem nova do outro lado
+   * que o tempo real não entregou (o aviso sonoro vem daí). */
+  onIncoming?: (message: ChatMessageDto) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessageDto[]>([]);
   const [draft, setDraft] = useState("");
   const [isPending, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement | null>(null);
 
+  const knownIds = useRef<Set<string> | null>(null);
+
   const reload = useCallback(async () => {
     const result = await listSupportMessages(sessionId);
-    if (result.ok && result.messages) {
-      setMessages((prev) => mergeMessages(prev, result.messages ?? []));
+    if (!(result.ok && result.messages)) return;
+    const fetched = result.messages;
+    // A primeira leitura só ESTABELECE o que já existia (histórico) — nada
+    // dela é "mensagem nova". Depois dela, o que aparecer do outro lado e não
+    // era conhecido avisa.
+    if (knownIds.current === null) {
+      knownIds.current = new Set(fetched.map((m) => m.id));
+    } else {
+      for (const m of fetched) {
+        if (!knownIds.current.has(m.id)) {
+          knownIds.current.add(m.id);
+          if (m.role !== side) onIncoming?.(m);
+        }
+      }
     }
-  }, [sessionId]);
+    setMessages((prev) => mergeMessages(prev, fetched));
+  }, [sessionId, side, onIncoming]);
 
   useEffect(() => {
     // Adiado (não síncrono): a primeira leitura grava estado, e `setState`
@@ -63,6 +82,9 @@ export function SupportChat({
     function onMessage(event: Event) {
       const detail = (event as CustomEvent<{ sessionId: string; message: ChatMessageDto }>).detail;
       if (detail.sessionId !== sessionId) return;
+      // O tempo real já avisou (painel); só marca como conhecida para a
+      // releitura não avisar de novo.
+      knownIds.current?.add(detail.message.id);
       setMessages((prev) => mergeMessages(prev, [detail.message]));
     }
     window.addEventListener(SUPPORT_CHAT_EVENT, onMessage);
@@ -70,7 +92,8 @@ export function SupportChat({
   }, [sessionId]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
   }, [messages.length]);
 
   function handleSend(e: React.FormEvent) {

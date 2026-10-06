@@ -64,7 +64,7 @@ export function DraggablePanel({
     if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
     const start = currentPosition();
     grab.current = { dx: e.clientX - start.x, dy: e.clientY - start.y };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     setPos(start);
   }
 
@@ -75,7 +75,9 @@ export function DraggablePanel({
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
     grab.current = null;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+    // `?.`: nem todo ambiente (testes em jsdom, navegadores antigos) tem captura
+    // de ponteiro — sem ela o arrasto ainda funciona, só pode "soltar" fora.
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
   }

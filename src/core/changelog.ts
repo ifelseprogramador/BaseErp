@@ -24,6 +24,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.2",
+    date: "2026-10-06",
+    changes: [
+      {
+        type: "novo",
+        text: "Quando chega uma mensagem na conversa do suporte, toca um aviso sonoro (dá para silenciar no ícone de som), o título da aba pisca se você estiver em outra aba e, com a conversa recolhida, aparece o número de mensagens não lidas.",
+      },
+      {
+        type: "melhoria",
+        text: "A caixa de conversa do suporte também pode ser arrastada para qualquer lugar da tela e recolhida.",
+      },
+    ],
+  },
+  {
     version: "0.7.1",
     date: "2026-10-06",
     changes: [

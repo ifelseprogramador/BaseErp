@@ -17,7 +17,7 @@ import { logger } from "@/core/logger";
 import { getRealtimeChannel, liveSessionChannelName } from "../realtime";
 import { endLiveSession, getFullSnapshot, type ChatMessageDto } from "../actions";
 import { dispatchChatMessage } from "../chat-events";
-import { SupportChat } from "./support-chat";
+import { SupportChatPanel } from "./support-chat-panel";
 
 // `target` de um evento "mouse-interaction" do Replayer vem do
 // `contentDocument` do iframe — outro realm de JS, com seu próprio
@@ -570,7 +570,7 @@ export function LiveSessionViewer({
           Passe o mouse sobre o espelho para usar o controle remoto (mouse e teclado).
         </p>
       )}
-      {status === "active" && <SupportChat sessionId={sessionId} side="admin" />}
+      {status === "active" && <SupportChatPanel sessionId={sessionId} side="admin" />}
     </div>
   );
 }

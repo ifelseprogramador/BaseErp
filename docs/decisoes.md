@@ -879,3 +879,24 @@ captura (mouse e toque), setas do teclado na barra, nunca sai da janela
 (re-ajusta ao redimensionar e ao recolher/expandir). Sem persistência entre
 recarregamentos, de propósito (ler `localStorage` na renderização causa
 diferença entre servidor e navegador).
+
+## 2026-10-06 — Painel da conversa: arrastável nos dois lados, aviso sonoro e não lidas
+
+`SupportChatPanel` unifica a conversa do usuário e do admin: caixa flutuante
+arrastável (`DraggablePanel`), que recolhe, com aviso sonoro de mensagem nova,
+título da aba piscando em segundo plano, botão de silenciar e contador de não
+lidas recolhida. Fica montada durante toda a sessão ativa e ouve o evento do
+tempo real (`chat-events.ts`) — por isso avisa mesmo recolhida; a lista/campo
+(`SupportChat`) só existe com o painel aberto.
+
+- Som sintetizado com Web Audio (dois tons), sem arquivo para baixar. O navegador
+  só toca depois de a pessoa ter interagido com a página; ela sempre clicou em
+  algo para chegar à sessão, então na prática toca. Se recusar, falha em silêncio
+  e o contador de não lidas continua avisando.
+- Cada mensagem avisa UMA vez (dedupe por id), venha pelo tempo real ou pela
+  releitura periódica de segurança (`onIncoming`). O histórico da primeira
+  leitura nunca conta como "nova".
+- Preferência de som em `localStorage`, lida com `useSyncExternalStore`
+  (servidor sempre "ligado") para não divergir do HTML do servidor.
+- O admin passou a ver a conversa flutuante (antes ficava fixa abaixo do
+  espelho, rolando para fora da tela).
