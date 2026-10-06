@@ -15,13 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logger } from "@/core/logger";
 import { adminSupportInboxChannelName, getRealtimeChannel } from "@/core/live-support/realtime";
-import { acceptSupportRequest } from "@/core/live-support/actions";
-
-interface PendingRequest {
-  sessionId: string;
-  organizationId: string;
-  organizationName: string;
-}
+import { acceptSupportRequest, requestAccessToSession } from "@/core/live-support/actions";
+import { itemFromBroadcast, upsertRequest, type SupportRequestItem } from "./support-requests";
 
 /**
  * Sino no cabeçalho do admin (visível em toda página `/admin/*`, não só
@@ -34,7 +29,7 @@ interface PendingRequest {
 export function SupportNotificationBell({
   initialRequests,
 }: {
-  initialRequests: PendingRequest[];
+  initialRequests: SupportRequestItem[];
 }) {
   const [requests, setRequests] = useState(initialRequests);
   const [isPending, startTransition] = useTransition();
@@ -43,18 +38,15 @@ export function SupportNotificationBell({
     const channel = getRealtimeChannel(adminSupportInboxChannelName());
     channel
       .on("broadcast", { event: "request" }, ({ payload }) => {
-        const organizationName = (payload.organizationName as string) ?? "Organização";
-        setRequests((prev) => [
-          ...prev,
-          {
-            sessionId: payload.sessionId as string,
-            organizationId: payload.organizationId as string,
-            organizationName,
-          },
-        ]);
-        toast.info(`${organizationName} está chamando o suporte`, {
+        const item = itemFromBroadcast(payload, "pending");
+        setRequests((prev) => upsertRequest(prev, item));
+        toast.info(`${item.userName} (${item.organizationName}) está chamando o suporte`, {
           description: "Clique no sino para atender.",
         });
+      })
+      .on("broadcast", { event: "missed" }, ({ payload }) => {
+        const item = itemFromBroadcast(payload, "missed");
+        setRequests((prev) => upsertRequest(prev, item));
       })
       .subscribe((subscribeStatus, err) => {
         if (subscribeStatus === "CHANNEL_ERROR" || subscribeStatus === "TIMED_OUT") {
@@ -66,9 +58,13 @@ export function SupportNotificationBell({
     };
   }, []);
 
-  function handleAccept(sessionId: string, organizationId: string) {
+  function handleAccept(request: SupportRequestItem) {
+    const { sessionId, organizationId } = request;
     startTransition(async () => {
-      const result = await acceptSupportRequest(sessionId);
+      const result =
+        request.status === "pending"
+          ? await acceptSupportRequest(sessionId)
+          : await requestAccessToSession(sessionId);
       if (result.ok) {
         setRequests((prev) => prev.filter((r) => r.sessionId !== sessionId));
         // Recarregamento completo (não router.push) de propósito: o
@@ -92,7 +88,7 @@ export function SupportNotificationBell({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Pedidos de suporte pendentes"
+            aria-label="Pedidos de suporte"
             className="relative text-zinc-50"
           />
         }
@@ -104,9 +100,9 @@ export function SupportNotificationBell({
           </span>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Pedidos de suporte pendentes</DropdownMenuLabel>
+          <DropdownMenuLabel>Pedidos de suporte</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {requests.length === 0 ? (
             <p className="text-muted-foreground px-2 py-3 text-center text-sm">
@@ -117,9 +113,16 @@ export function SupportNotificationBell({
               <DropdownMenuItem
                 key={r.sessionId}
                 disabled={isPending}
-                onClick={() => handleAccept(r.sessionId, r.organizationId)}
+                onClick={() => handleAccept(r)}
               >
-                {r.organizationName}
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate">
+                    {r.userName} — {r.organizationName}
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {r.status === "pending" ? "Esperando agora" : "Sem atendimento — pedir acesso"}
+                  </span>
+                </span>
               </DropdownMenuItem>
             ))
           )}

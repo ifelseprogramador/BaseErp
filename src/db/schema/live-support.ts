@@ -41,6 +41,11 @@ export const liveSessionStatusEnum = pgEnum("live_session_status", [
   "active",
   "ended",
   "declined",
+  // Pedido que o USUÁRIO abriu e ninguém da plataforma atendeu dentro do
+  // tempo de espera (ou não havia ninguém online). O dono da plataforma
+  // vê no painel e pode pedir acesso à tela depois
+  // (`actions.ts#requestAccessToSession`).
+  "missed",
 ]);
 export const liveSessionInitiatorEnum = pgEnum("live_session_initiator", ["admin", "user"]);
 
@@ -54,6 +59,16 @@ export const liveSessions = pgTable(
     initiatedBy: liveSessionInitiatorEnum("initiated_by").notNull(),
     adminUserId: uuid("admin_user_id"),
     requestedByUserId: uuid("requested_by_user_id"),
+    // QUEM é o assunto da sessão: a pessoa cuja tela é espelhada. A sessão é
+    // de UMA pessoa, não da organização — antes era da organização inteira e,
+    // numa empresa com vários usuários, o widget de TODOS entrava na sessão
+    // (e o controle remoto do suporte valia na tela de todos). Nulo só em
+    // sessões antigas, anteriores ao multiusuário.
+    subjectUserId: uuid("subject_user_id"),
+    // Fim da espera por atendimento (só em pedido aberto pelo usuário):
+    // `now + platform_settings.support_wait_seconds`. Depois disso o pedido
+    // vira `missed` (`actions.ts#expireSupportRequest`).
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     status: liveSessionStatusEnum("status").notNull().default("pending"),
     // Começa SEM controle, mesmo depois de active — o usuário concede
     // controle do mouse/teclado numa etapa à parte (grantControl).
@@ -74,6 +89,31 @@ export const liveSessions = pgTable(
     index("live_sessions_organization_id_idx").on(table.organizationId),
     index("live_sessions_status_idx").on(table.status),
   ],
+);
+
+/**
+ * Conversa de texto da sessão (tipo o chat do TeamViewer): usuário e
+ * suporte trocam mensagens enquanto a sessão está ativa. Persistida para
+ * sobreviver a recarregar a página; o Broadcast só avisa o outro lado em
+ * tempo real. Só quem participa da sessão lê/escreve (ver RLS em
+ * migrations-custom).
+ */
+export const liveSessionMessages = pgTable(
+  "live_session_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => liveSessions.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    senderUserId: uuid("sender_user_id").notNull(),
+    senderRole: liveSessionInitiatorEnum("sender_role").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("live_session_messages_session_idx").on(table.sessionId, table.createdAt)],
 );
 
 export const liveSessionsRelations = relations(liveSessions, ({ one }) => ({

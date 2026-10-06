@@ -15,3 +15,4 @@ export * from "./schema/backup";
 export * from "./schema/notifications";
 export * from "./schema/sharing";
 export * from "./schema/audit";
+export * from "./schema/platform-settings";

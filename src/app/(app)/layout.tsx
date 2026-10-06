@@ -171,7 +171,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {!org.impersonating && (
         <LiveSupportWidget
-          organizationId={org.organizationId}
+          userId={org.userId}
           initialSession={
             openSession && (openSession.status === "pending" || openSession.status === "active")
               ? {
@@ -179,6 +179,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   status: openSession.status,
                   initiatedBy: openSession.initiatedBy,
                   controlGranted: openSession.controlGranted,
+                  expiresAt: openSession.expiresAt?.toISOString() ?? null,
                 }
               : null
           }

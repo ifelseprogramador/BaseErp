@@ -155,6 +155,11 @@ export const membershipModules = pgTable(
  */
 export const platformAdmins = pgTable("platform_admins", {
   userId: uuid("user_id").primaryKey(),
+  // Última batida de presença do painel `/admin` aberto
+  // (`core/live-support/actions.ts#adminHeartbeat`, a cada ~20 s). "Online"
+  // = bateu há menos de ~45 s — é o que decide, no servidor, se um pedido de
+  // suporte espera atendimento ou já vira "perdida" + aviso no Telegram.
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

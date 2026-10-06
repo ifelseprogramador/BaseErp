@@ -15,7 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { logger } from "@/core/logger";
 import { getRealtimeChannel, liveSessionChannelName } from "../realtime";
-import { endLiveSession, getFullSnapshot } from "../actions";
+import { endLiveSession, getFullSnapshot, type ChatMessageDto } from "../actions";
+import { dispatchChatMessage } from "../chat-events";
+import { SupportChat } from "./support-chat";
 
 // `target` de um evento "mouse-interaction" do Replayer vem do
 // `contentDocument` do iframe — outro realm de JS, com seu próprio
@@ -253,6 +255,9 @@ export function LiveSessionViewer({
       .on("broadcast", { event: "control" }, ({ payload }) => {
         setControlGranted(Boolean(payload.granted));
       })
+      .on("broadcast", { event: "message" }, ({ payload }) => {
+        dispatchChatMessage(sessionId, payload as ChatMessageDto);
+      })
       .on("broadcast", { event: "rrweb" }, ({ payload }) => {
         const event = payload as eventWithTime;
         if (!replayerRef.current) {
@@ -423,7 +428,7 @@ export function LiveSessionViewer({
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Badge variant={status === "active" ? "secondary" : "outline"}>
-          {status === "active" ? "Ao vivo" : "Aguardando aprovação da organização..."}
+          {status === "active" ? "Ao vivo" : "Aguardando aprovação da pessoa..."}
         </Badge>
         {controlGranted && <Badge>Controle remoto concedido</Badge>}
         {connectionError && (
@@ -531,6 +536,7 @@ export function LiveSessionViewer({
           Passe o mouse sobre o espelho para usar o controle remoto (mouse e teclado).
         </p>
       )}
+      {status === "active" && <SupportChat sessionId={sessionId} side="admin" />}
     </div>
   );
 }

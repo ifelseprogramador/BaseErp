@@ -24,6 +24,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.0",
+    date: "2026-10-06",
+    changes: [
+      {
+        type: "novo",
+        text: 'O "Chamar suporte" agora avisa na hora quando o suporte não está online, e o responsável pela plataforma é avisado para entrar em contato. Se houver alguém online, você vê uma contagem enquanto aguarda atendimento.',
+      },
+      {
+        type: "novo",
+        text: "Durante o atendimento, usuário e suporte conversam por uma caixa de texto ao lado da tela compartilhada.",
+      },
+      {
+        type: "correcao",
+        text: "Em empresas com vários usuários, o pedido de suporte e o acesso à tela passaram a valer só para a pessoa que pediu ajuda — antes apareciam para todos da empresa.",
+      },
+    ],
+  },
+  {
     version: "0.6.1",
     date: "2026-10-06",
     changes: [

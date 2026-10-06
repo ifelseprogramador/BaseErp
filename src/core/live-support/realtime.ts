@@ -14,9 +14,11 @@ export function liveSessionChannelName(sessionId: string) {
   return `live-session:${sessionId}`;
 }
 
-/** Canal por organização — onde o widget do usuário escuta pedidos do admin. */
-export function orgSupportChannelName(organizationId: string) {
-  return `support-org:${organizationId}`;
+/** Canal por PESSOA — onde o widget daquela pessoa escuta pedidos do admin.
+ * Era por organização: numa empresa com vários usuários, o pedido do suporte
+ * aparecia para todos eles. */
+export function userSupportChannelName(userId: string) {
+  return `support-user:${userId}`;
 }
 
 /** Canal global — onde o dashboard do admin escuta pedidos abertos por usuários. */

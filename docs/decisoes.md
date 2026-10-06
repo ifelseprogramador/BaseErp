@@ -808,3 +808,50 @@ dizia quem criou ou alterou algo, nem quem mudou o status de uma OS/pedido.
   nas migrations deles. Validado num Postgres em memória (11 cenários: autoria
   forjada, update por outra pessoa, histórico imutável, isolamento entre
   organizações, nomes entre colegas).
+
+## 2026-10-06 — Suporte ao vivo por pessoa, espera configurável e chat
+
+**Problemas:** (1) a sessão de suporte era da ORGANIZAÇÃO: com vários usuários
+na empresa, o widget de TODOS entrava na sessão (gravando a própria tela no
+mesmo registro) e o controle remoto do suporte valia na tela de todos. (2)
+"Chamar suporte" criava um pedido e esperava para sempre, sem dizer ao usuário
+que ninguém estava lá e sem avisar o dono. (3) Sem canal de conversa durante o
+atendimento.
+
+**Decisões:**
+
+- Sessão por PESSOA: `live_sessions.subject_user_id` (quem tem a tela
+  espelhada). RLS passou de `apply_org_rls` (qualquer membro lia/alterava) para
+  "só a própria pessoa e o admin"; o canal de aviso é `support-user:<userId>`
+  (antes `support-org:<orgId>`). Colega, mesmo o dono da conta, não vê nem
+  encerra a sessão do outro.
+- Presença do dono: o painel `/admin` aberto e visível bate
+  `platform_admins.last_seen_at` a cada ~20 s (`AdminPresenceBeacon`);
+  "online" = batida < 45 s, consultada no servidor por
+  `any_platform_admin_online()` (SECURITY DEFINER — o usuário não lê
+  `platform_admins`). Escolhido em vez de Supabase Presence porque o servidor
+  precisa decidir (Telegram) sem depender de um navegador.
+- Fluxo do pedido: online → `pending` com `expires_at = agora +
+platform_settings.support_wait_seconds` (padrão 30 s, 5–300, editável em
+  `/admin`) e contagem na tela do usuário; offline → já nasce `missed`. Ao
+  zerar, o navegador chama `expireSupportRequest`, mas QUEM decide é o servidor
+  (confere `expires_at`, só troca se ainda `pending`). `missed` → Telegram +
+  caixa de entrada do `/admin`. Limitação conhecida: se a pessoa fechar a aba
+  durante a contagem, ninguém dispara a expiração — o pedido continua `pending`
+  na caixa de entrada do admin (visível), só não gera o Telegram.
+- Telegram por variáveis de ambiente (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`):
+  o token não fica no banco. Melhor esforço, nunca derruba o pedido. Mensagem só
+  com nome da pessoa e da empresa.
+- Voltando depois: o admin usa "Pedir acesso à tela" num pedido `missed`; a MESMA
+  sessão reabre como pedido do admin e a pessoa precisa APROVAR de novo (o
+  pedido pode ter sido horas atrás). Sem aprovação automática.
+- Chat: `live_session_messages` (RLS: só quem participa, só com a sessão
+  ativa, ninguém edita/apaga). Persistido; o broadcast só acelera e uma releitura
+  a cada 10 s cobre broadcast perdido. O papel (admin × usuário) vem do servidor.
+- Um "Chamar suporte" repetido em até 5 min de um pedido `missed` não cria outro
+  nem manda outro Telegram.
+
+Migrations: drizzle `0007_live_support_per_user`, custom
+`0011_live_support_per_user`. Validado num Postgres em memória (28 cenários de
+RLS/presença/configuração) e 15 testes unitários (espera, expiração, alerta,
+chat, Telegram).

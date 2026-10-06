@@ -21,16 +21,17 @@ import { ResetMemberPasswordButton } from "@/core/admin/components/reset-member-
 import { AuditLogCard } from "@/core/admin/components/audit-log-card";
 import { LiveSupportCard } from "@/core/admin/components/live-support-card";
 import { getAllModules } from "@/core/registry";
-import { getOpenSessionForOrgAdmin } from "@/core/live-support/queries";
+import { getOpenSessionForOrgAdmin, listSupportTargetsForOrg } from "@/core/live-support/queries";
 
 export default async function AdminOrganizationDetailPage({
   params,
 }: PageProps<"/admin/organizacoes/[id]">) {
   const { id } = await params;
   const { withDb } = await requireAdmin();
-  const [data, openSession] = await Promise.all([
+  const [data, openSession, supportTargets] = await Promise.all([
     withDb((db) => getOrganizationForAdmin(db, id)),
     getOpenSessionForOrgAdmin(id),
+    listSupportTargetsForOrg(id),
   ]);
 
   if (!data) {
@@ -80,6 +81,7 @@ export default async function AdminOrganizationDetailPage({
 
       <LiveSupportCard
         organizationId={org.id}
+        targets={supportTargets}
         initialSession={
           openSession && (openSession.status === "pending" || openSession.status === "active")
             ? {

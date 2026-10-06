@@ -111,6 +111,15 @@ empresa.
   aparecem em empresa multiusuário. Nomes vêm de `get_user_display_info`, que
   serve qualquer membro da organização (só gente das organizações do chamador).
 
+### Suporte ao vivo (`core/live-support/`)
+
+Sessão por PESSOA (`subjectUserId`), nunca da organização. Fluxo: usuário clica
+"Chamar suporte" → se há admin online, espera `support_wait_seconds` (contagem
+na tela); senão, ou se ninguém aceitar, vira `missed`, o dono recebe aviso no
+Telegram e o pedido fica na caixa de entrada do `/admin`, de onde ele pede
+acesso à tela e a pessoa aprova. Sessão ativa: espelho (rrweb) + controle
+remoto opcional + chat de texto. Detalhes e motivos em `docs/decisoes.md`.
+
 ## RLS (Row-Level Security)
 
 **Migrations custom em SQL puro**, em `src/db/migrations-custom/`,

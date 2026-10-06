@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { eventWithTime } from "@rrweb/types";
 import { toast } from "sonner";
-import { Headset, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Headset, MessageSquare, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -15,7 +15,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { logger } from "@/core/logger";
-import { getRealtimeChannel, liveSessionChannelName, orgSupportChannelName } from "../realtime";
+import { getRealtimeChannel, liveSessionChannelName, userSupportChannelName } from "../realtime";
+import { dispatchChatMessage } from "../chat-events";
+import { SupportChat } from "./support-chat";
 import { applyControlEvent } from "../apply-control-event";
 import type { ControlEvent } from "../control-events";
 import {
@@ -23,6 +25,8 @@ import {
   callForSupport,
   declineSupportSession,
   endLiveSession,
+  expireSupportRequest,
+  type ChatMessageDto,
   saveFullSnapshot,
   setControlGranted,
 } from "../actions";
@@ -32,11 +36,18 @@ export interface LiveSessionState {
   status: "pending" | "active";
   initiatedBy: "admin" | "user";
   controlGranted: boolean;
+  /** ISO do fim da espera por atendimento (só pedido aberto por ESTA pessoa). */
+  expiresAt?: string | null;
 }
 
+const SUPPORT_OFFLINE_NOTICE =
+  "O suporte não está online no momento. Já avisamos o responsável — assim que ele entrar, você receberá um pedido para ele acompanhar sua tela.";
+
 /**
- * Widget do lado do usuário da organização: espera pedido do admin (modal
- * de consentimento), deixa chamar o suporte, grava e transmite a tela
+ * Widget do lado da PESSOA (não da organização inteira): espera pedido do
+ * admin endereçado a ela (modal de consentimento), deixa chamar o suporte —
+ * com contagem de espera e aviso "suporte offline" —, conversa por texto com
+ * o atendimento, grava e transmite a tela
  * (rrweb) enquanto a sessão está `active`, e aplica os eventos de
  * controle remoto quando `controlGranted` é true. Montado uma vez em
  * `(app)/layout.tsx` — sobrevive à navegação entre páginas (é o mesmo
@@ -44,13 +55,16 @@ export interface LiveSessionState {
  * clique em um link.
  */
 export function LiveSupportWidget({
-  organizationId,
+  userId,
   initialSession,
 }: {
-  organizationId: string;
+  userId: string;
   initialSession: LiveSessionState | null;
 }) {
   const [session, setSession] = useState<LiveSessionState | null>(initialSession);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [chatOpen, setChatOpen] = useState(true);
   const [isPending, startTransition] = useTransition();
   const sessionRef = useRef(session);
   const stopRecordingRef = useRef<(() => void) | null>(null);
@@ -60,9 +74,9 @@ export function LiveSupportWidget({
     sessionRef.current = session;
   }, [session]);
 
-  // Escuta pedidos que o admin abrir para esta organização, mesmo sem sessão aberta.
+  // Escuta pedidos que o admin abrir PARA ESTA PESSOA, mesmo sem sessão aberta.
   useEffect(() => {
-    const channel = getRealtimeChannel(orgSupportChannelName(organizationId));
+    const channel = getRealtimeChannel(userSupportChannelName(userId));
     channel
       .on("broadcast", { event: "request" }, ({ payload }) => {
         if (sessionRef.current) return;
@@ -75,13 +89,13 @@ export function LiveSupportWidget({
       })
       .subscribe((subscribeStatus, err) => {
         if (subscribeStatus === "CHANNEL_ERROR" || subscribeStatus === "TIMED_OUT") {
-          logger.error("live_support.canal_org_falhou", { organizationId, subscribeStatus, err });
+          logger.error("live_support.canal_usuario_falhou", { subscribeStatus, err });
         }
       });
     return () => {
       channel.unsubscribe();
     };
-  }, [organizationId]);
+  }, [userId]);
 
   // Canal da sessão atual (status, controle, e o transporte do rrweb quando ativa).
   useEffect(() => {
@@ -99,6 +113,9 @@ export function LiveSupportWidget({
       })
       .on("broadcast", { event: "control" }, ({ payload }) => {
         setSession((prev) => (prev ? { ...prev, controlGranted: Boolean(payload.granted) } : prev));
+      })
+      .on("broadcast", { event: "message" }, ({ payload }) => {
+        dispatchChatMessage(session.id, payload as ChatMessageDto);
       })
       .on("broadcast", { event: "control-input" }, ({ payload }) => {
         if (sessionRef.current?.controlGranted) {
@@ -120,6 +137,49 @@ export function LiveSupportWidget({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- de propósito: só quer resubscrever quando o id da sessão muda, não a cada status/controlGranted que este mesmo efeito produz (senão reconecta o canal em loop)
   }, [session?.id]);
+
+  // Contagem da espera por atendimento (pedido aberto POR esta pessoa). Ao
+  // zerar, o SERVIDOR decide: se ninguém atendeu vira "perdido" e o dono é
+  // avisado no Telegram; se alguém aceitou no último instante, segue ativa.
+  // `secondsLeft` é DERIVADO do relógio (`now`), não um estado próprio.
+  const expiresAt =
+    session?.status === "pending" && session.initiatedBy === "user"
+      ? (session.expiresAt ?? null)
+      : null;
+  const pendingId = session?.id;
+  const secondsLeft = expiresAt
+    ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000))
+    : null;
+  const countdownDone = secondsLeft === 0;
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const first = setTimeout(() => setNow(Date.now()), 0);
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(interval);
+    };
+  }, [expiresAt]);
+
+  useEffect(() => {
+    if (!countdownDone || !pendingId) return;
+    let cancelled = false;
+    void expireSupportRequest(pendingId).then((result) => {
+      if (cancelled) return;
+      if (result.status === "missed") {
+        setSession(null);
+        setNotice(SUPPORT_OFFLINE_NOTICE);
+      } else if (result.status === "active") {
+        setSession((prev) => (prev ? { ...prev, status: "active", expiresAt: null } : prev));
+      } else if (result.status === "ended" || result.status === "declined") {
+        setSession(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [countdownDone, pendingId]);
 
   // Liga/desliga a gravação junto do status virar/deixar de ser "active".
   useEffect(() => {
@@ -208,12 +268,16 @@ export function LiveSupportWidget({
   function handleCallForSupport() {
     startTransition(async () => {
       const result = await callForSupport();
-      if (result.ok && result.sessionId) {
+      if (result.ok && result.status === "missed") {
+        // Ninguém do suporte online agora: o dono já foi avisado no Telegram.
+        setNotice(SUPPORT_OFFLINE_NOTICE);
+      } else if (result.ok && result.sessionId) {
         setSession({
           id: result.sessionId,
-          status: "pending",
+          status: result.status === "active" ? "active" : "pending",
           initiatedBy: "user",
           controlGranted: false,
+          expiresAt: result.expiresAt ?? null,
         });
       } else {
         toast.error(result.message ?? "Não foi possível chamar o suporte.");
@@ -240,7 +304,20 @@ export function LiveSupportWidget({
 
   return (
     <>
-      {!session && (
+      {notice && (
+        <div
+          role="status"
+          className="bg-card fixed right-4 bottom-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border p-3 text-sm shadow-lg"
+        >
+          <WifiOff className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+          <span>{notice}</span>
+          <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>
+            Ok
+          </Button>
+        </div>
+      )}
+
+      {!session && !notice && (
         <Button
           variant="outline"
           title="Chamar suporte"
@@ -269,7 +346,7 @@ export function LiveSupportWidget({
       <Dialog open={session?.status === "pending" && session.initiatedBy === "admin"}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Suporte BaseERP quer ver sua tela</DialogTitle>
+            <DialogTitle>O suporte quer ver sua tela</DialogTitle>
             <DialogDescription>
               Alguém do suporte quer acompanhar o que você está fazendo no sistema, ao vivo, para te
               ajudar. Você pode encerrar quando quiser, e controle remoto só acontece se você
@@ -289,7 +366,12 @@ export function LiveSupportWidget({
 
       {session?.status === "pending" && session.initiatedBy === "user" && (
         <div className="bg-card fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-lg border p-3 text-sm shadow-lg">
-          <span>Aguardando atendimento do suporte...</span>
+          <span>
+            Aguardando atendimento do suporte...
+            {secondsLeft !== null && (
+              <span className="text-muted-foreground tabular-nums"> {secondsLeft}s</span>
+            )}
+          </span>
           <Button variant="ghost" size="sm" onClick={handleEnd}>
             Cancelar
           </Button>
@@ -330,6 +412,24 @@ export function LiveSupportWidget({
               Encerrar
             </Button>
           </div>
+        </div>
+      )}
+
+      {session?.status === "active" && (
+        <div className="bg-card fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border p-3 shadow-lg">
+          <button
+            type="button"
+            onClick={() => setChatOpen((open) => !open)}
+            className="flex items-center justify-between text-sm font-medium"
+            aria-expanded={chatOpen}
+          >
+            <span className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Conversa com o suporte
+            </span>
+            {chatOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+          {chatOpen && <SupportChat sessionId={session.id} side="user" />}
         </div>
       )}
 
