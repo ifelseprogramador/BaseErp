@@ -14,9 +14,12 @@ import type { ModuleDefinition } from "@/core/registry";
  */
 export function SidebarNav({
   modules,
+  isOwner,
   onNavigate,
 }: {
   modules: ModuleDefinition[];
+  /** Só o responsável pela conta vê áreas que não são módulo (backup). */
+  isOwner: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -29,7 +32,9 @@ export function SidebarNav({
       href: m.href,
       icon: resolveIcon(m.iconName),
     })),
-    { slug: "backup", label: "Backup", href: "/backup", icon: DatabaseBackup },
+    ...(isOwner
+      ? [{ slug: "backup", label: "Backup", href: "/backup", icon: DatabaseBackup }]
+      : []),
   ];
 
   return (

@@ -7,6 +7,7 @@ import { createSupabaseAdminClient } from "@/core/supabase/admin";
 import { recordAudit } from "@/core/admin/audit";
 import { isPlatformAdmin } from "@/core/platform-admin";
 import { getEnabledModulesForOrg } from "@/core/module-settings";
+import { expandWithDependencies } from "@/core/module-access";
 import { generateTemporaryPassword } from "@/core/temp-password";
 import type { ActionResult } from "@/core/action-result";
 import { membershipModules, memberships, organizations } from "@/db/schema";
@@ -55,14 +56,22 @@ function errorText(err: unknown): string {
 const SEAT_LIMIT_MESSAGE =
   "Limite de usuários atingido. Desative alguém ou peça ao suporte para ampliar o plano.";
 
-/** Só os módulos que a organização tem habilitados podem ser concedidos. */
+/**
+ * Só os módulos que a organização tem habilitados podem ser concedidos, e
+ * a lista é fechada sob `dependsOn` (pedidos → clientes etc., ver
+ * `core/module-access.ts#expandWithDependencies`) — uma dependência que a
+ * organização não tem habilitada simplesmente não entra.
+ */
 async function filterToEnabledModules(
   ctx: TeamOwnerContext,
   requestedSlugs: string[],
 ): Promise<string[]> {
   const enabled = await ctx.withDb((db) => getEnabledModulesForOrg(db, ctx.organizationId));
   const allowed = new Set(enabled.map((m) => m.slug));
-  return requestedSlugs.filter((s) => allowed.has(s));
+  return expandWithDependencies(
+    requestedSlugs.filter((s) => allowed.has(s)),
+    enabled,
+  ).filter((s) => allowed.has(s));
 }
 
 export interface InviteMemberResult extends ActionResult {

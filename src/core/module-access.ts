@@ -24,6 +24,29 @@ export function canAccessModule(access: ModuleAccess, slug: string): boolean {
   return access.all || access.slugs.has(slug);
 }
 
+/**
+ * Fecha a lista de módulos liberados sob `dependsOn` (declarado em cada
+ * `module.ts`): quem recebe "pedidos" também precisa ler "clientes", senão
+ * a tela de pedido quebra ao listar clientes. Transitivo; ignora slug
+ * desconhecido. Aplicado ao GRAVAR as permissões (`core/team/actions.ts`),
+ * então o que está em `membership_modules` já vem completo.
+ */
+export function expandWithDependencies(
+  slugs: Iterable<string>,
+  modules: { slug: string; dependsOn?: string[] }[],
+): string[] {
+  const bySlug = new Map(modules.map((m) => [m.slug, m]));
+  const result = new Set<string>();
+  const stack = [...slugs];
+  while (stack.length > 0) {
+    const slug = stack.pop()!;
+    if (result.has(slug) || !bySlug.has(slug)) continue;
+    result.add(slug);
+    stack.push(...(bySlug.get(slug)!.dependsOn ?? []));
+  }
+  return [...result];
+}
+
 export function filterModulesByAccess<T extends { slug: string }>(
   modules: T[],
   access: ModuleAccess,

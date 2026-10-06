@@ -1,4 +1,4 @@
-import { getActiveOrg, withOrg } from "@/core/auth";
+import { ModuleAccessDeniedError, getActiveOrg, requireOwner } from "@/core/auth";
 import { getAutomaticBackup } from "@/core/backup";
 
 /** Baixa um backup automático específico (gerado pelo cron diário) —
@@ -6,7 +6,11 @@ import { getAutomaticBackup } from "@/core/backup";
  * checando que o backup pedido é da organização de quem está logado. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [{ withDb }, org] = await Promise.all([withOrg(), getActiveOrg()]);
+  const access = await Promise.all([requireOwner(), getActiveOrg()]).catch((err) =>
+    err instanceof ModuleAccessDeniedError ? null : Promise.reject(err),
+  );
+  if (!access) return new Response("Acesso negado.", { status: 403 });
+  const [{ withDb }, org] = access;
 
   const backup = await withDb((tx) => getAutomaticBackup(tx, org.organizationId, id));
   if (!backup) {

@@ -3,6 +3,7 @@ import {
   FULL_MODULE_ACCESS,
   buildModuleAccess,
   canAccessModule,
+  expandWithDependencies,
   filterModulesByAccess,
 } from "@/core/module-access";
 
@@ -41,5 +42,37 @@ describe("filterModulesByAccess", () => {
   it("ignora slug liberado que não existe mais no registro", () => {
     const access = buildModuleAccess("staff", ["modulo-removido"]);
     expect(filterModulesByAccess(modules, access)).toEqual([]);
+  });
+});
+
+describe("expandWithDependencies", () => {
+  const registry = [
+    { slug: "clientes" },
+    { slug: "catalogo" },
+    { slug: "pedidos", dependsOn: ["clientes", "catalogo"] },
+    { slug: "fiscal", dependsOn: ["pedidos"] },
+    { slug: "financeiro" },
+  ];
+
+  it("inclui dependências diretas e transitivas", () => {
+    expect(expandWithDependencies(["fiscal"], registry).sort()).toEqual([
+      "catalogo",
+      "clientes",
+      "fiscal",
+      "pedidos",
+    ]);
+  });
+
+  it("não adiciona nada a módulo sem dependência e não duplica", () => {
+    expect(expandWithDependencies(["financeiro", "financeiro"], registry)).toEqual(["financeiro"]);
+  });
+
+  it("ignora slug desconhecido e tolera dependência circular", () => {
+    expect(expandWithDependencies(["fantasma"], registry)).toEqual([]);
+    const circular = [
+      { slug: "a", dependsOn: ["b"] },
+      { slug: "b", dependsOn: ["a"] },
+    ];
+    expect(expandWithDependencies(["a"], circular).sort()).toEqual(["a", "b"]);
   });
 });

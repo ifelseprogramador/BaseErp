@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.6.1",
+    date: "2026-10-06",
+    changes: [
+      {
+        type: "melhoria",
+        text: "Em empresas com vários usuários, o Backup passou a ser exclusivo do responsável pela conta, e liberar um módulo para alguém já libera os módulos de que ele depende (ex.: Pedidos libera Clientes).",
+      },
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-10-05",
     changes: [

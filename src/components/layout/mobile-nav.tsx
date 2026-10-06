@@ -8,7 +8,7 @@ import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { VersionBadge } from "@/components/version-badge";
 import type { ModuleDefinition } from "@/core/registry";
 
-export function MobileNav({ modules }: { modules: ModuleDefinition[] }) {
+export function MobileNav({ modules, isOwner }: { modules: ModuleDefinition[]; isOwner: boolean }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -27,7 +27,7 @@ export function MobileNav({ modules }: { modules: ModuleDefinition[] }) {
         <SheetHeader className="border-sidebar-border border-b px-4 py-3">
           <SheetTitle className="text-sidebar-foreground">BaseERP</SheetTitle>
         </SheetHeader>
-        <SidebarNav modules={modules} onNavigate={() => setOpen(false)} />
+        <SidebarNav modules={modules} isOwner={isOwner} onNavigate={() => setOpen(false)} />
         <div className="border-sidebar-border mt-auto border-t px-2 py-2">
           <VersionBadge className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground" />
         </div>

@@ -771,3 +771,17 @@ cada vertical, e `requireModule` dentro de cada módulo (este template não tem
 módulos). Verticais precisam aplicar a migration, trocar `withOrg()` por
 `requireModule(slug)` e acrescentar `membership_modules` ao
 `hardDeleteOrganization` se não usarem cascade.
+
+## 2026-10-06 — Multiusuário: backup só do responsável, dependências e ModuleGuard
+
+- `requireOwner()` (`core/auth.ts`) protege áreas que não são módulo e dão visão
+  da empresa inteira: **Backup** (página, ações e rotas de download, 403 nas
+  rotas). Antes, uma pessoa `staff` sem nenhum módulo ainda baixava o backup com
+  os dados de todos. O link some do menu (`SidebarNav isOwner`).
+- `expandWithDependencies()` (`core/module-access.ts`): ao gravar permissões, a
+  lista é fechada sob `dependsOn` de cada `module.ts` (pedidos → clientes). Sem
+  isso, a tela de pedido quebrava ao listar clientes para quem só tinha pedidos.
+  A tela de equipe mostra "(também libera …)".
+- `components/module-guard.tsx`: casca de UX para o `layout.tsx` de cada módulo
+  (aviso "Sem acesso" em vez de erro). **Não é a proteção** — essa é
+  `requireModule()` em toda Server Action, consulta e rota do módulo.

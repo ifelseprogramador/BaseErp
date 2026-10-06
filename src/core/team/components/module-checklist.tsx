@@ -7,7 +7,7 @@ export function ModuleChecklist({
   modules,
   selected,
 }: {
-  modules: { slug: string; label: string }[];
+  modules: { slug: string; label: string; dependsOn?: string[] }[];
   selected: string[];
 }) {
   if (modules.length === 0) {
@@ -17,6 +17,7 @@ export function ModuleChecklist({
   }
 
   const selectedSet = new Set(selected);
+  const labelBySlug = new Map(modules.map((m) => [m.slug, m.label]));
   return (
     <div className="flex flex-col gap-2">
       {modules.map((m) => (
@@ -28,7 +29,15 @@ export function ModuleChecklist({
             defaultChecked={selectedSet.has(m.slug)}
             className="h-4 w-4"
           />
-          {m.label}
+          <span>
+            {m.label}
+            {m.dependsOn && m.dependsOn.length > 0 && (
+              <span className="text-muted-foreground text-xs">
+                {" "}
+                (também libera {m.dependsOn.map((d) => labelBySlug.get(d) ?? d).join(", ")})
+              </span>
+            )}
+          </span>
         </label>
       ))}
     </div>

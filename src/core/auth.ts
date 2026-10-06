@@ -321,6 +321,22 @@ export async function withOrg(): Promise<OrgContext> {
 }
 
 /**
+ * `withOrg()` + exige o responsável pela conta (`role === "owner"`). Use em
+ * áreas que não são um módulo e que dão visão/ação sobre a empresa inteira
+ * (backup, configurações sensíveis) — uma pessoa `staff` de empresa
+ * multiusuário nunca deveria baixar um backup com os dados de todos os
+ * módulos, mesmo sem ter acesso a nenhum deles.
+ */
+export async function requireOwner(): Promise<OrgContext> {
+  const ctx = await withOrg();
+  if (ctx.role !== "owner") {
+    ctx.log.warn("auth.somente_responsavel");
+    throw new ModuleAccessDeniedError("Só o responsável pela conta acessa esta área.");
+  }
+  return ctx;
+}
+
+/**
  * `withOrg()` + checagem de acesso ao módulo. Use no começo de TODA Server
  * Action, página e rota de um módulo de negócio, no lugar de `withOrg()`:
  *   const { withDb } = await requireModule("ordens");

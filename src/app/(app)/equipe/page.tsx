@@ -24,7 +24,11 @@ export default async function TeamPage() {
     withDb((db) => getTeamOverview(db, organizationId)),
     withDb((db) => getEnabledModulesForOrg(db, organizationId)),
   ]);
-  const modules = enabledModules.map((m) => ({ slug: m.slug, label: m.label }));
+  const modules = enabledModules.map((m) => ({
+    slug: m.slug,
+    label: m.label,
+    dependsOn: (m.dependsOn ?? []).filter((d) => enabledModules.some((e) => e.slug === d)),
+  }));
   const labelBySlug = new Map(modules.map((m) => [m.slug, m.label]));
   const seatsFull = team.activeCount >= team.seatLimit;
 

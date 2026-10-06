@@ -112,7 +112,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </>
             )}
           </div>
-          <SidebarNav modules={modules} />
+          <SidebarNav modules={modules} isOwner={org.role === "owner"} />
           <div className="border-sidebar-border mt-auto flex flex-col gap-2 border-t px-2 py-2">
             {/* A marca do vertical (ícone + nome — mesma dupla do topo
                 antes de escolher um logo próprio, e o mesmo ícone da
@@ -132,7 +132,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center justify-between border-b px-4 py-3 print:hidden">
             <div className="flex items-center gap-2">
-              <MobileNav modules={modules} />
+              <MobileNav modules={modules} isOwner={org.role === "owner"} />
               <span className="text-sm font-medium">{displayName}</span>
             </div>
             <div className="flex items-center gap-3">

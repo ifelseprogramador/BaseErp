@@ -1,4 +1,4 @@
-import { getActiveOrg, withOrg } from "@/core/auth";
+import { ModuleAccessDeniedError, getActiveOrg, requireOwner } from "@/core/auth";
 import { buildOrgBackup } from "@/core/backup";
 
 /**
@@ -9,7 +9,11 @@ import { buildOrgBackup } from "@/core/backup";
  * vertical que registre módulos passa a ter conteúdo aqui automaticamente.
  */
 export async function GET() {
-  const [{ log, withDb }, activeOrg] = await Promise.all([withOrg(), getActiveOrg()]);
+  const access = await Promise.all([requireOwner(), getActiveOrg()]).catch((err) =>
+    err instanceof ModuleAccessDeniedError ? null : Promise.reject(err),
+  );
+  if (!access) return new Response("Acesso negado.", { status: 403 });
+  const [{ log, withDb }, activeOrg] = access;
   log.info("backup.exportar");
 
   const backup = await withDb((tx) =>

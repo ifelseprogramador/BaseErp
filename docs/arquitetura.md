@@ -81,7 +81,8 @@ Acesso por módulo: `membership_modules` (uma linha por módulo concedido).
 `owner` acessa tudo; `staff` só o que tem linha. `getActiveOrg()` devolve
 `moduleAccess`; **todo módulo de negócio deve chamar
 `requireModule("<slug>")` (`core/auth.ts`) no lugar de `withOrg()`** em
-toda Server Action, página e rota — o menu esconde o item
+toda Server Action, página e rota (áreas fora de módulo, como Backup, usam
+`requireOwner()`; o layout de cada módulo usa `<ModuleGuard slug>` só para UX) — o menu esconde o item
 (`filterModulesByAccess`), mas esconder não é proteção.
 
 No banco (`migrations-custom/0009_multiuser_team.sql`): `current_org_ids()`
