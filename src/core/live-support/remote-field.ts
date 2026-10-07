@@ -28,6 +28,36 @@ export interface ElementLike {
   readOnly?: boolean;
   disabled?: boolean;
   textContent?: string | null;
+  multiple?: boolean;
+  size?: number;
+  selectedIndex?: number;
+  options?: ArrayLike<{ text?: string; label?: string; disabled?: boolean }>;
+}
+
+export interface SelectChoice {
+  label: string;
+  disabled: boolean;
+}
+
+export interface SelectField {
+  options: SelectChoice[];
+  selectedIndex: number;
+}
+
+/**
+ * Um <select> comum (lista suspensa nativa)? O navegador desenha essa lista fora
+ * da página, então ela nunca aparece no espelho: o dono precisa de uma lista
+ * própria, montada a partir das opções do <select> da réplica.
+ */
+export function readSelectField(element: ElementLike | null | undefined): SelectField | null {
+  if (!element || element.tagName?.toUpperCase() !== "SELECT") return null;
+  if (element.disabled || element.multiple || (element.size ?? 0) > 1) return null;
+  const options = Array.from(element.options ?? []).map((o) => ({
+    label: (o.label || o.text || "").trim() || "(vazio)",
+    disabled: Boolean(o.disabled),
+  }));
+  if (options.length === 0) return null;
+  return { options, selectedIndex: element.selectedIndex ?? -1 };
 }
 
 export interface EditableField {

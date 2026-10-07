@@ -35,7 +35,12 @@ import {
 import { dispatchChatMessage } from "../chat-events";
 import { SupportChatPanel } from "./support-chat-panel";
 import { RemoteTypingInput, type RemoteTypingHandle } from "./remote-typing-input";
-import { elementAtFraction, readEditableField } from "../remote-field";
+import {
+  elementAtFraction,
+  readEditableField,
+  readSelectField,
+  type SelectField,
+} from "../remote-field";
 
 // `target` de um evento "mouse-interaction" do Replayer vem do
 // `contentDocument` do iframe — outro realm de JS, com seu próprio
@@ -421,6 +426,12 @@ export function LiveSessionViewer({
     pendingY: number;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  // Lista de opções de um <select> tocado no espelho (a lista nativa não aparece lá).
+  const [selectPicker, setSelectPicker] = useState<{
+    xFrac: number;
+    yFrac: number;
+    field: SelectField;
+  } | null>(null);
   const zoomRef = useRef(1);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
@@ -449,6 +460,17 @@ export function LiveSessionViewer({
     if (!rect) return;
     const xFrac = (e.clientX - rect.left) / rect.width;
     const yFrac = (e.clientY - rect.top) / rect.height;
+
+    // <select> nativo: a lista dele é desenhada pelo navegador e não vem no
+    // espelho, então mostramos uma lista própria e mandamos só a opção escolhida.
+    if (controlGrantedRef.current) {
+      const select = readSelectField(elementAtFraction(getIframe(), xFrac, yFrac));
+      if (select) {
+        typingRef.current?.blur();
+        setSelectPicker({ xFrac, yFrac, field: select });
+        return;
+      }
+    }
 
     // O que foi tocado na réplica da tela: só um campo de TEXTO leva o foco ao
     // campo de digitação (abre o teclado do celular, ainda dentro do gesto do
@@ -817,6 +839,41 @@ export function LiveSessionViewer({
                   : undefined
               }
             />
+          </div>
+        </div>
+      )}
+      {selectPicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          onClick={() => setSelectPicker(null)}
+        >
+          <div
+            role="listbox"
+            aria-label="Escolher opção na tela da pessoa"
+            className="bg-background max-h-[70vh] w-full max-w-sm overflow-y-auto rounded-lg border p-1 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {selectPicker.field.options.map((option, index) => (
+              <button
+                key={index}
+                type="button"
+                role="option"
+                aria-selected={index === selectPicker.field.selectedIndex}
+                disabled={option.disabled}
+                onClick={() => {
+                  sendControl({
+                    type: "select",
+                    xFrac: selectPicker.xFrac,
+                    yFrac: selectPicker.yFrac,
+                    index,
+                  });
+                  setSelectPicker(null);
+                }}
+                className="hover:bg-muted aria-selected:bg-muted flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium disabled:opacity-50"
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         </div>
       )}

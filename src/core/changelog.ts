@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.10.2",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "No controle remoto, os menus suspensos agora funcionam: tocar numa lista de opções mostra as opções para o dono escolher (a lista nativa do navegador não aparece no espelho), e menus feitos em JS passam a abrir com o clique do dono.",
+      },
+    ],
+  },
+  {
     version: "0.10.1",
     date: "2026-10-07",
     changes: [

@@ -8,7 +8,7 @@ import type { ControlEvent } from "./control-events";
  * chamado quando `controlGranted` é true para a sessão.
  */
 export function applyControlEvent(event: ControlEvent, cursorEl: HTMLElement | null) {
-  const hasFrac = event.type === "move" || event.type === "click";
+  const hasFrac = event.type === "move" || event.type === "click" || event.type === "select";
   const x = Math.round(hasFrac ? event.xFrac * window.innerWidth : 0);
   const y = Math.round(hasFrac ? event.yFrac * window.innerHeight : 0);
 
@@ -27,7 +27,19 @@ export function applyControlEvent(event: ControlEvent, cursorEl: HTMLElement | n
     const el = document.elementFromPoint(x, y);
     if (el instanceof HTMLElement) {
       el.focus?.({ preventScroll: true });
+      pressSequence(el, x, y);
       el.click();
+    }
+    return;
+  }
+
+  if (event.type === "select") {
+    const select = document.elementFromPoint(x, y)?.closest("select");
+    const option = select?.options[event.index];
+    if (select && option && !option.disabled) {
+      select.selectedIndex = event.index;
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
     }
     return;
   }
@@ -43,6 +55,27 @@ export function applyControlEvent(event: ControlEvent, cursorEl: HTMLElement | n
   if (event.type === "scroll") {
     window.scrollBy(event.deltaX, event.deltaY);
   }
+}
+
+/**
+ * Menus e listas feitos em JS (Base UI/Radix) abrem no "apertar" do mouse
+ * (pointerdown/mousedown), não no `click`. Só `el.click()` não os abria; este é o
+ * mesmo caminho que um clique de verdade percorre antes do `click`.
+ */
+function pressSequence(el: HTMLElement, x: number, y: number) {
+  const base = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 };
+  if (typeof PointerEvent !== "undefined") {
+    el.dispatchEvent(
+      new PointerEvent("pointerdown", { ...base, pointerType: "mouse", isPrimary: true }),
+    );
+  }
+  el.dispatchEvent(new MouseEvent("mousedown", base));
+  if (typeof PointerEvent !== "undefined") {
+    el.dispatchEvent(
+      new PointerEvent("pointerup", { ...base, pointerType: "mouse", isPrimary: true }),
+    );
+  }
+  el.dispatchEvent(new MouseEvent("mouseup", base));
 }
 
 /** Texto vindo do campo de digitação do admin (celular): edita o campo focado. */

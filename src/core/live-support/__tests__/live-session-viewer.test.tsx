@@ -194,12 +194,60 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
     });
   });
 
+  describe("lista suspensa (<select>)", () => {
+    const select = {
+      tagName: "SELECT",
+      selectedIndex: 0,
+      options: [{ text: "Pix" }, { text: "Dinheiro" }, { text: "Cartão", disabled: true }],
+    };
+
+    it("tocar num <select> mostra as opções e não manda clique", () => {
+      const container = renderActive();
+      mountIframe(container, select);
+
+      fireEvent.click(container, { clientX: 500, clientY: 400 });
+
+      expect(screen.getByRole("option", { name: "Dinheiro" })).toBeTruthy();
+      expect(controlsSent()).toHaveLength(0);
+    });
+
+    it("escolher uma opção manda só o índice dela e fecha a lista", () => {
+      const container = renderActive();
+      mountIframe(container, select);
+      fireEvent.click(container, { clientX: 500, clientY: 400 });
+
+      fireEvent.click(screen.getByRole("option", { name: "Dinheiro" }));
+
+      expect(controlsSent()).toEqual([{ type: "select", xFrac: 0.5, yFrac: 0.5, index: 1 }]);
+      expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("opção desativada não pode ser escolhida", () => {
+      const container = renderActive();
+      mountIframe(container, select);
+      fireEvent.click(container);
+      expect((screen.getByRole("option", { name: "Cartão" }) as HTMLButtonElement).disabled).toBe(
+        true,
+      );
+    });
+  });
+
   describe("rolar a tela da pessoa", () => {
     it("arrastar DOIS dedos para cima rola a página dela para baixo", () => {
       const container = renderActive();
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 100, clientY: 300 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }, { clientX: 100, clientY: 200 }] });
+      fireEvent.touchStart(container, {
+        touches: [
+          { clientX: 100, clientY: 300 },
+          { clientX: 100, clientY: 300 },
+        ],
+      });
+      fireEvent.touchMove(container, {
+        touches: [
+          { clientX: 100, clientY: 200 },
+          { clientX: 100, clientY: 200 },
+        ],
+      });
 
       expect(controlsSent()).toContainEqual({ type: "scroll", deltaX: 0, deltaY: 100 });
     });
@@ -207,8 +255,18 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
     it("dois dedos para baixo rolam para cima; para os lados rola na horizontal", () => {
       const container = renderActive();
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 200, clientY: 100 }, { clientX: 200, clientY: 100 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 150, clientY: 160 }, { clientX: 150, clientY: 160 }] });
+      fireEvent.touchStart(container, {
+        touches: [
+          { clientX: 200, clientY: 100 },
+          { clientX: 200, clientY: 100 },
+        ],
+      });
+      fireEvent.touchMove(container, {
+        touches: [
+          { clientX: 150, clientY: 160 },
+          { clientX: 150, clientY: 160 },
+        ],
+      });
 
       expect(controlsSent()).toContainEqual({ type: "scroll", deltaX: 50, deltaY: -60 });
     });
@@ -216,8 +274,18 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
     it("movimento mínimo é um toque, não uma rolagem", () => {
       const container = renderActive();
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 100 }, { clientX: 100, clientY: 100 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 102, clientY: 103 }, { clientX: 102, clientY: 103 }] });
+      fireEvent.touchStart(container, {
+        touches: [
+          { clientX: 100, clientY: 100 },
+          { clientX: 100, clientY: 100 },
+        ],
+      });
+      fireEvent.touchMove(container, {
+        touches: [
+          { clientX: 102, clientY: 103 },
+          { clientX: 102, clientY: 103 },
+        ],
+      });
       fireEvent.touchEnd(container);
 
       expect(controlsSent().filter((c) => c.type === "scroll")).toHaveLength(0);
@@ -227,8 +295,18 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
       const container = renderActive();
       mountIframe(container, { tagName: "BUTTON" });
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 100, clientY: 300 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }, { clientX: 100, clientY: 200 }] });
+      fireEvent.touchStart(container, {
+        touches: [
+          { clientX: 100, clientY: 300 },
+          { clientX: 100, clientY: 300 },
+        ],
+      });
+      fireEvent.touchMove(container, {
+        touches: [
+          { clientX: 100, clientY: 200 },
+          { clientX: 100, clientY: 200 },
+        ],
+      });
       fireEvent.touchEnd(container);
       fireEvent.click(container, { clientX: 100, clientY: 200 });
 
@@ -239,7 +317,12 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
       const container = renderActive();
       mountIframe(container, { tagName: "BUTTON" });
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 100 }, { clientX: 100, clientY: 100 }] });
+      fireEvent.touchStart(container, {
+        touches: [
+          { clientX: 100, clientY: 100 },
+          { clientX: 100, clientY: 100 },
+        ],
+      });
       fireEvent.touchEnd(container);
       fireEvent.click(container, { clientX: 100, clientY: 100 });
 
@@ -249,8 +332,18 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
     it("sem o controle liberado, arrastar não manda nada (e o espelho rola só localmente)", () => {
       const container = renderActive(false);
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 100, clientY: 300 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }, { clientX: 100, clientY: 200 }] });
+      fireEvent.touchStart(container, {
+        touches: [
+          { clientX: 100, clientY: 300 },
+          { clientX: 100, clientY: 300 },
+        ],
+      });
+      fireEvent.touchMove(container, {
+        touches: [
+          { clientX: 100, clientY: 200 },
+          { clientX: 100, clientY: 200 },
+        ],
+      });
 
       expect(controlsSent()).toHaveLength(0);
       expect(container.style.touchAction).toBe("");

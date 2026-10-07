@@ -1093,3 +1093,14 @@ toque como passivo, um listener nativo não passivo faz `preventDefault` em `tou
 com 2+ dedos, para o navegador não rolar o lado do dono ao mesmo tempo. Limite: se o primeiro
 dedo já começou a rolar nativamente antes de o segundo encostar, esse gesto não é cancelável —
 basta soltar e repetir com os dois dedos juntos.
+
+## 2026-10-07 — Menus suspensos no controle remoto
+
+Dois problemas diferentes. (1) `<select>` nativo: a lista é desenhada pelo navegador, fora da
+página, então o rrweb nunca a grava — o dono não vê as opções e não consegue clicar nelas. Agora,
+ao tocar num `<select>` do espelho, o dono vê uma lista própria (montada das opções da réplica,
+`readSelectField`) e o evento `select {xFrac,yFrac,index}` define a opção no `<select>` real da
+pessoa (`selectedIndex` + `input`/`change`). (2) Menus em JS (Base UI): abrem no `pointerdown`/
+`mousedown`, e o controle remoto só chamava `el.click()`; agora o clique remoto percorre
+pointerdown → mousedown → pointerup → mouseup → click. Limite: quando é a PESSOA quem abre um
+`<select>` nativo, o dono continua sem ver a lista aberta (só vê o valor depois que ela escolhe).
