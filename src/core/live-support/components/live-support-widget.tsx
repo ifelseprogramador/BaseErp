@@ -33,9 +33,13 @@ import {
 
 export interface LiveSessionState {
   id: string;
-  status: "pending" | "active";
+  /** `chat` = conversa só por texto (começou pelo Telegram do suporte); vira
+   * `active` quando a pessoa libera a tela — mesma sessão, mesmo histórico. */
+  status: "pending" | "active" | "chat";
   initiatedBy: "admin" | "user";
   controlGranted: boolean;
+  /** Em `chat`: o suporte pediu para ver a tela e a pessoa ainda não respondeu. */
+  screenRequested?: boolean;
   /** ISO do fim da espera por atendimento (só pedido aberto por ESTA pessoa). */
   expiresAt?: string | null;
 }
@@ -88,6 +92,20 @@ export function LiveSupportWidget({
           controlGranted: false,
         });
       })
+      .on("broadcast", { event: "chat-open" }, ({ payload }) => {
+        // O suporte respondeu pelo Telegram: abre a caixa de conversa.
+        setSession((prev) =>
+          prev
+            ? prev
+            : {
+                id: payload.sessionId as string,
+                status: "chat",
+                initiatedBy: "user",
+                controlGranted: false,
+                screenRequested: false,
+              },
+        );
+      })
       .subscribe((subscribeStatus, err) => {
         if (subscribeStatus === "CHANNEL_ERROR" || subscribeStatus === "TIMED_OUT") {
           logger.error("live_support.canal_usuario_falhou", { subscribeStatus, err });
@@ -109,8 +127,15 @@ export function LiveSupportWidget({
         if (status === "ended" || status === "declined") {
           setSession(null);
         } else {
-          setSession((prev) => (prev ? { ...prev, status: status as "active" } : prev));
+          setSession((prev) =>
+            prev ? { ...prev, status: status as "active" | "chat", screenRequested: false } : prev,
+          );
         }
+      })
+      .on("broadcast", { event: "screen-request" }, () => {
+        setSession((prev) =>
+          prev && prev.status === "chat" ? { ...prev, screenRequested: true } : prev,
+        );
       })
       .on("broadcast", { event: "control" }, ({ payload }) => {
         setSession((prev) => (prev ? { ...prev, controlGranted: Boolean(payload.granted) } : prev));
@@ -278,14 +303,17 @@ export function LiveSupportWidget({
     if (!session) return;
     startTransition(async () => {
       await approveSupportSession(session.id);
-      setSession((prev) => (prev ? { ...prev, status: "active" } : prev));
+      setSession((prev) => (prev ? { ...prev, status: "active", screenRequested: false } : prev));
     });
   }
 
   function handleDecline() {
     if (!session) return;
     const id = session.id;
-    setSession(null);
+    // Numa conversa por texto, recusar a TELA não encerra a conversa.
+    setSession((prev) =>
+      prev && prev.status === "chat" ? { ...prev, screenRequested: false } : null,
+    );
     startTransition(async () => {
       await declineSupportSession(id);
     });
@@ -300,7 +328,8 @@ export function LiveSupportWidget({
       } else if (result.ok && result.sessionId) {
         setSession({
           id: result.sessionId,
-          status: result.status === "active" ? "active" : "pending",
+          status:
+            result.status === "active" ? "active" : result.status === "chat" ? "chat" : "pending",
           initiatedBy: "user",
           controlGranted: false,
           expiresAt: result.expiresAt ?? null,
@@ -369,7 +398,12 @@ export function LiveSupportWidget({
         </Button>
       )}
 
-      <Dialog open={session?.status === "pending" && session.initiatedBy === "admin"}>
+      <Dialog
+        open={
+          (session?.status === "pending" && session.initiatedBy === "admin") ||
+          (session?.status === "chat" && Boolean(session.screenRequested))
+        }
+      >
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>O suporte quer ver sua tela</DialogTitle>
@@ -441,7 +475,13 @@ export function LiveSupportWidget({
         </div>
       )}
 
-      {session?.status === "active" && <SupportChatPanel sessionId={session.id} side="user" />}
+      {(session?.status === "active" || session?.status === "chat") && (
+        <SupportChatPanel
+          sessionId={session.id}
+          side="user"
+          onEnd={session.status === "chat" ? handleEnd : undefined}
+        />
+      )}
 
       {session?.status === "active" && session.controlGranted && (
         <div

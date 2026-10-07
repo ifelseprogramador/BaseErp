@@ -86,6 +86,12 @@ export const organizations = pgTable("organizations", {
   multiUser: boolean("multi_user").notNull().default(false),
   seatLimit: integer("seat_limit").notNull().default(1),
   extraSeatPriceCents: integer("extra_seat_price_cents"),
+  // Quanto um usuário DESTA organização espera por atendimento ao "Chamar
+  // suporte" (com o dono da plataforma online) antes de o pedido virar "sem
+  // atendimento" e o Telegram avisar. Por organização, não global: o dono da
+  // plataforma combina um prazo diferente com cada cliente. 5–300 s (check no
+  // banco); só o dono da plataforma altera (gatilho de organizations).
+  supportWaitSeconds: integer("support_wait_seconds").notNull().default(30),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

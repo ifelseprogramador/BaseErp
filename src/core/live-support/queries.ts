@@ -4,10 +4,9 @@ import type { Database } from "@/core/db";
 import { withOrg } from "@/core/auth";
 import { requireAdmin } from "@/core/admin-auth";
 import { getUserDisplayInfoByIds } from "@/core/user-lookup";
-import { liveSessions, memberships, organizations, platformSettings } from "@/db/schema";
-import { DEFAULT_SUPPORT_WAIT_SECONDS, clampWaitSeconds } from "./wait";
+import { liveSessions, memberships, organizations } from "@/db/schema";
 
-const OPEN_STATUSES = ["pending", "active"] as const;
+const OPEN_STATUSES = ["pending", "active", "chat"] as const;
 
 /**
  * Fecha pedidos `pending` cujo prazo (`expires_at`) já passou, sem cron: roda
@@ -72,8 +71,9 @@ export interface SupportRequestRow {
   organizationName: string;
   subjectUserId: string | null;
   userName: string;
-  /** `pending` = ainda dentro do tempo de espera; `missed` = ninguém atendeu. */
-  status: "pending" | "missed";
+  /** `pending` = ainda dentro do tempo de espera; `missed` = ninguém atendeu;
+   * `chat` = conversa só por texto em andamento (veio do Telegram). */
+  status: "pending" | "missed" | "chat";
   createdAt: Date;
 }
 
@@ -100,7 +100,11 @@ export async function listPendingUserRequestsForAdmin(): Promise<SupportRequestR
       .where(
         and(
           eq(liveSessions.initiatedBy, "user"),
-          or(eq(liveSessions.status, "pending"), eq(liveSessions.status, "missed")),
+          or(
+            eq(liveSessions.status, "pending"),
+            eq(liveSessions.status, "missed"),
+            eq(liveSessions.status, "chat"),
+          ),
         ),
       )
       .orderBy(desc(liveSessions.createdAt))
@@ -117,7 +121,7 @@ export async function listPendingUserRequestsForAdmin(): Promise<SupportRequestR
       organizationName: r.organizationName,
       subjectUserId: r.subjectUserId,
       userName: (r.subjectUserId && names.get(r.subjectUserId)?.name) || "Usuário",
-      status: r.status as "pending" | "missed",
+      status: r.status as "pending" | "missed" | "chat",
       createdAt: r.createdAt,
     }));
   });
@@ -179,13 +183,4 @@ export async function listSupportTargetsForOrg(organizationId: string) {
       role: m.role,
     }));
   });
-}
-
-/** Tempo de espera configurado (segundos) — para o formulário em /admin. */
-export async function getSupportWaitSeconds(): Promise<number> {
-  const { withDb } = await requireAdmin();
-  const [row] = await withDb((db) =>
-    db.select({ seconds: platformSettings.supportWaitSeconds }).from(platformSettings).limit(1),
-  );
-  return clampWaitSeconds(row?.seconds ?? DEFAULT_SUPPORT_WAIT_SECONDS);
 }

@@ -5,8 +5,9 @@ export interface SupportRequestItem {
   organizationName: string;
   userName: string;
   /** `pending` = pessoa ainda esperando (dá para atender agora);
-   * `missed` = ninguém atendeu (pedir acesso à tela, a pessoa aprova). */
-  status: "pending" | "missed";
+   * `missed` = ninguém atendeu (pedir acesso à tela, a pessoa aprova);
+   * `chat` = conversa só por texto em andamento (veio do Telegram). */
+  status: "pending" | "missed" | "chat";
 }
 
 /** Payload dos broadcasts `request`/`missed` do canal da caixa de entrada. */

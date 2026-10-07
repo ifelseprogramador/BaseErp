@@ -159,3 +159,20 @@ describe("SupportChatPanel — tamanho ajustável", () => {
     expect(panelRoot().style.height).toBe("");
   });
 });
+
+describe("SupportChatPanel — encerrar conversa por texto", () => {
+  it("sem onEnd, não mostra o botão", () => {
+    render(<SupportChatPanel sessionId={SESSION} side="user" />);
+    expect(screen.queryByRole("button", { name: "Encerrar conversa" })).toBeNull();
+  });
+
+  it("com onEnd, o botão encerra sem iniciar o arrasto", async () => {
+    const onEnd = vi.fn();
+    const user = userEvent.setup();
+    render(<SupportChatPanel sessionId={SESSION} side="user" onEnd={onEnd} />);
+
+    await user.click(screen.getByRole("button", { name: "Encerrar conversa" }));
+
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+});

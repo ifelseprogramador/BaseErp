@@ -173,12 +173,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <LiveSupportWidget
           userId={org.userId}
           initialSession={
-            openSession && (openSession.status === "pending" || openSession.status === "active")
+            openSession &&
+            (openSession.status === "pending" ||
+              openSession.status === "active" ||
+              openSession.status === "chat")
               ? {
                   id: openSession.id,
                   status: openSession.status,
                   initiatedBy: openSession.initiatedBy,
                   controlGranted: openSession.controlGranted,
+                  screenRequested: openSession.screenRequested,
                   expiresAt: openSession.expiresAt?.toISOString() ?? null,
                 }
               : null

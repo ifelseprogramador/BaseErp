@@ -57,6 +57,13 @@
       "when": 1791317620734,
       "tag": "0007_live_support_per_user",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791337649096,
+      "tag": "0008_support_telegram_chat",
+      "breakpoints": true
     }
   ]
 }

@@ -4,25 +4,32 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { sendTelegramTest, updateSupportWaitSeconds } from "@/core/live-support/actions";
-import { MAX_SUPPORT_WAIT_SECONDS, MIN_SUPPORT_WAIT_SECONDS } from "@/core/live-support/wait";
+import {
+  getTelegramWebhookStatus,
+  registerTelegramWebhook,
+  sendTelegramTest,
+  type TelegramWebhookStatus,
+} from "@/core/live-support/actions";
 
-/** Quanto o usuário espera por atendimento antes de o pedido virar "sem
- * atendimento" (e o Telegram avisar). Configuração global da plataforma. */
+/**
+ * Telegram do atendimento: avisos de pedido sem atendimento e respostas pelo
+ * Telegram. O tempo de espera NÃO fica aqui — é por organização (na ficha de
+ * cada uma). Os segredos vêm de variáveis de ambiente; este card só testa e
+ * registra o que elas configuram.
+ */
 export function SupportSettingsCard({
-  initialSeconds,
   telegramConfigured,
+  webhookSecretConfigured,
 }: {
-  initialSeconds: number;
   telegramConfigured: boolean;
+  webhookSecretConfigured: boolean;
 }) {
-  const [seconds, setSeconds] = useState(String(initialSeconds));
-  const [isPending, startTransition] = useTransition();
   const [isTesting, startTesting] = useTransition();
+  const [isRegistering, startRegistering] = useTransition();
+  const [isChecking, startChecking] = useTransition();
+  const [status, setStatus] = useState<TelegramWebhookStatus | null>(null);
 
-  function handleTelegramTest() {
+  function handleTest() {
     startTesting(async () => {
       const result = await sendTelegramTest();
       if (result.ok) toast.success("Mensagem de teste enviada. Confira o Telegram.");
@@ -30,70 +37,101 @@ export function SupportSettingsCard({
     });
   }
 
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    const value = Number(seconds);
-    if (
-      !Number.isFinite(value) ||
-      value < MIN_SUPPORT_WAIT_SECONDS ||
-      value > MAX_SUPPORT_WAIT_SECONDS
-    ) {
-      toast.error(
-        `Informe entre ${MIN_SUPPORT_WAIT_SECONDS} e ${MAX_SUPPORT_WAIT_SECONDS} segundos.`,
-      );
-      return;
-    }
-    startTransition(async () => {
-      const result = await updateSupportWaitSeconds(value);
-      if (result.ok) toast.success("Tempo de espera salvo.");
-      else toast.error(result.message ?? "Não foi possível salvar.");
+  function handleRegister() {
+    startRegistering(async () => {
+      const result = await registerTelegramWebhook();
+      if (result.ok) {
+        toast.success("Respostas pelo Telegram ativadas.");
+        setStatus(await getTelegramWebhookStatus());
+      } else {
+        toast.error(result.message ?? "Não foi possível registrar.");
+      }
     });
+  }
+
+  function handleCheck() {
+    startChecking(async () => setStatus(await getTelegramWebhookStatus()));
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Atendimento de suporte</CardTitle>
+        <CardTitle>Telegram do atendimento</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <form onSubmit={handleSave} className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="supportWait">Tempo de espera do usuário (segundos)</Label>
-            <Input
-              id="supportWait"
-              type="number"
-              min={MIN_SUPPORT_WAIT_SECONDS}
-              max={MAX_SUPPORT_WAIT_SECONDS}
-              value={seconds}
-              onChange={(e) => setSeconds(e.target.value)}
-              className="w-32"
-            />
-          </div>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Salvando..." : "Salvar"}
-          </Button>
-        </form>
         <p className="text-muted-foreground text-xs">
-          Quando alguém clica em &quot;Chamar suporte&quot; com você online, espera esse tempo por
-          um atendimento. Sem ninguém online (ou passado o tempo), o pedido fica aqui e você é
-          avisado pelo Telegram.
+          Quando alguém chama o suporte e você não está com este painel aberto (ou o tempo de espera
+          da empresa acaba), o aviso chega no Telegram. Se você <strong>responder</strong> a
+          mensagem lá, a resposta aparece na caixa de conversa da pessoa; quando ela liberar a tela,
+          a conversa continua aqui no painel. O tempo de espera de cada empresa fica na ficha dela.
         </p>
-        <div className="flex flex-wrap items-center gap-3">
+
+        <p className={telegramConfigured ? "text-xs text-emerald-600" : "text-destructive text-xs"}>
+          {telegramConfigured
+            ? "Avisos configurados (token e chat id)."
+            : "Avisos NÃO configurados: defina TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID nas variáveis de ambiente."}
+        </p>
+        <p
+          className={
+            webhookSecretConfigured ? "text-xs text-emerald-600" : "text-muted-foreground text-xs"
+          }
+        >
+          {webhookSecretConfigured
+            ? "Segredo das respostas definido (TELEGRAM_WEBHOOK_SECRET)."
+            : "Para responder pelo Telegram, defina também TELEGRAM_WEBHOOK_SECRET (uma senha longa e aleatória)."}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleTelegramTest}
+            onClick={handleTest}
             disabled={isTesting || !telegramConfigured}
           >
             {isTesting ? "Enviando..." : "Enviar mensagem de teste"}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRegister}
+            disabled={isRegistering || !telegramConfigured || !webhookSecretConfigured}
+          >
+            {isRegistering ? "Registrando..." : "Ativar respostas pelo Telegram"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleCheck}
+            disabled={isChecking || !telegramConfigured}
+          >
+            {isChecking ? "Consultando..." : "Verificar situação"}
+          </Button>
         </div>
-        <p className={telegramConfigured ? "text-xs text-emerald-600" : "text-destructive text-xs"}>
-          {telegramConfigured
-            ? "Telegram configurado."
-            : "Telegram NÃO configurado: defina TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID nas variáveis de ambiente para receber os avisos."}
-        </p>
+
+        {status && (
+          <p
+            className={
+              status.ok && status.matchesThisSite
+                ? "text-xs text-emerald-600"
+                : "text-muted-foreground text-xs"
+            }
+          >
+            {!status.ok
+              ? status.message
+              : !status.url
+                ? "Respostas pelo Telegram: NÃO ativadas (nenhum endereço registrado)."
+                : status.matchesThisSite
+                  ? `Respostas pelo Telegram ativas neste sistema.${
+                      status.lastErrorMessage
+                        ? ` Último erro do Telegram: ${status.lastErrorMessage}`
+                        : ""
+                    }`
+                  : `O bot está apontado para outro endereço (${status.url}). Clique em "Ativar respostas pelo Telegram" para apontar para este sistema.`}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

@@ -60,6 +60,10 @@ export function SupportNotificationBell({
 
   function handleAccept(request: SupportRequestItem) {
     const { sessionId, organizationId } = request;
+    if (request.status === "chat") {
+      window.location.assign(`/admin/organizacoes/${organizationId}`);
+      return;
+    }
     startTransition(async () => {
       const result =
         request.status === "pending"
@@ -120,7 +124,11 @@ export function SupportNotificationBell({
                     {r.userName} — {r.organizationName}
                   </span>
                   <span className="text-muted-foreground text-xs">
-                    {r.status === "pending" ? "Esperando agora" : "Sem atendimento — pedir acesso"}
+                    {r.status === "pending"
+                      ? "Esperando agora"
+                      : r.status === "chat"
+                        ? "Conversa por texto — abrir"
+                        : "Sem atendimento — pedir acesso"}
                   </span>
                 </span>
               </DropdownMenuItem>

@@ -10,7 +10,8 @@ import { LiveSessionViewer } from "@/core/live-support/components/live-session-v
 
 interface OpenSession {
   id: string;
-  status: "pending" | "active";
+  status: "pending" | "active" | "chat";
+  screenRequested?: boolean;
   controlGranted: boolean;
 }
 
@@ -77,6 +78,7 @@ export function LiveSupportCard({
           <LiveSessionViewer
             sessionId={session.id}
             initialStatus={session.status}
+            initialScreenRequested={session.screenRequested}
             initialControlGranted={session.controlGranted}
             onEnded={() => setSession(null)}
           />

@@ -4,7 +4,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireEnv } from "@/core/env";
 
 // "/d/" = link público de documento compartilhado com o cliente (core/share).
-const PUBLIC_PATHS = ["/login", "/d/"];
+// "/api/cron/" = rotas do Vercel Cron (sem sessão de usuário; cada uma exige
+// `Authorization: Bearer <CRON_SECRET>` por conta própria — sem estar aqui, o
+// cron receberia um redirecionamento para /login em vez de rodar).
+// "/api/telegram/webhook" = respostas do dono pelo Telegram (a rota valida o
+// segredo do cabeçalho e o chat do dono por conta própria).
+const PUBLIC_PATHS = ["/login", "/d/", "/api/cron/", "/api/telegram/webhook"];
+
+/** O caminho dispensa sessão de usuário? (Puro, para teste.) */
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+}
 
 /**
  * Renova a sessão do Supabase a cada request e redireciona para /login
@@ -48,9 +58,9 @@ export async function updateSession(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicPath = PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
+  const publicPath = isPublicPath(request.nextUrl.pathname);
 
-  if (!user && !isPublicPath) {
+  if (!user && !publicPath) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);

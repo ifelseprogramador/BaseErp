@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, MessageSquare, Volume2, VolumeX } from "lucide-react";
+import { ChevronDown, ChevronUp, MessageSquare, Volume2, VolumeX, X } from "lucide-react";
 import type { ChatMessageDto } from "../actions";
 import { SUPPORT_CHAT_EVENT } from "../chat-events";
 import { flashTabTitle, playChatSound, setSoundEnabled, useSoundEnabled } from "../chat-sound";
@@ -20,10 +20,14 @@ export function SupportChatPanel({
   sessionId,
   side,
   className,
+  onEnd,
 }: {
   sessionId: string;
   side: "admin" | "user";
   className?: string;
+  /** Mostra "encerrar conversa" no cabeçalho (conversa só por texto, em que não
+   * há a barra da sessão de tela para encerrar). */
+  onEnd?: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const [unread, setUnread] = useState(0);
@@ -96,6 +100,18 @@ export function SupportChatPanel({
             >
               {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
+            {onEnd && (
+              <button
+                type="button"
+                data-no-drag
+                onClick={onEnd}
+                aria-label="Encerrar conversa"
+                title="Encerrar conversa"
+                className="hover:bg-muted rounded p-0.5"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               data-no-drag

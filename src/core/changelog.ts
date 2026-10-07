@@ -24,6 +24,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.8.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: "Se você pedir suporte e ninguém estiver online, o responsável pode te responder pelo próprio Telegram e a resposta aparece na sua caixa de conversa. Quando você liberar a tela, a conversa continua na mesma caixa, sem trocar de lugar.",
+      },
+      {
+        type: "melhoria",
+        text: "O tempo de espera por atendimento agora é combinado com cada empresa, em vez de ser igual para todas.",
+      },
+      {
+        type: "correcao",
+        text: "As tarefas automáticas (como o backup diário) não são mais redirecionadas para a tela de login.",
+      },
+    ],
+  },
+  {
     version: "0.7.3",
     date: "2026-10-06",
     changes: [

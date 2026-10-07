@@ -1,4 +1,14 @@
-import { pgTable, pgEnum, uuid, text, boolean, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  pgEnum,
+  uuid,
+  text,
+  boolean,
+  bigint,
+  timestamp,
+  jsonb,
+  index,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./tenancy";
 
@@ -46,6 +56,10 @@ export const liveSessionStatusEnum = pgEnum("live_session_status", [
   // vê no painel e pode pedir acesso à tela depois
   // (`actions.ts#requestAccessToSession`).
   "missed",
+  // Conversa só por TEXTO, sem compartilhar a tela: nasce quando o dono responde
+  // pelo Telegram a um pedido sem atendimento (`telegram-bridge.ts`) e segue
+  // no MESMO chat quando a tela passa a ser compartilhada (`active`).
+  "chat",
 ]);
 export const liveSessionInitiatorEnum = pgEnum("live_session_initiator", ["admin", "user"]);
 
@@ -69,6 +83,10 @@ export const liveSessions = pgTable(
     // `now + platform_settings.support_wait_seconds`. Depois disso o pedido
     // vira `missed` (`actions.ts#expireSupportRequest`).
     expiresAt: timestamp("expires_at", { withTimezone: true }),
+    // Em conversa por texto (`chat`), o suporte pediu para ver a tela e a pessoa
+    // ainda não respondeu: o widget mostra o aviso de consentimento sem fechar
+    // a conversa. Volta a `false` ao aprovar (a sessão vira `active`) ou recusar.
+    screenRequested: boolean("screen_requested").notNull().default(false),
     status: liveSessionStatusEnum("status").notNull().default("pending"),
     // Começa SEM controle, mesmo depois de active — o usuário concede
     // controle do mouse/teclado numa etapa à parte (grantControl).
@@ -114,6 +132,24 @@ export const liveSessionMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("live_session_messages_session_idx").on(table.sessionId, table.createdAt)],
+);
+
+/**
+ * Mensagens que o servidor mandou ao Telegram do dono sobre uma sessão (o
+ * alerta de pedido sem atendimento e cada mensagem do usuário encaminhada).
+ * Serve para ligar uma RESPOSTA do dono ("Responder" numa dessas mensagens) de
+ * volta à sessão certa. Só o servidor lê/escreve (RLS: admin/sistema).
+ */
+export const supportTelegramMessages = pgTable(
+  "support_telegram_messages",
+  {
+    telegramMessageId: bigint("telegram_message_id", { mode: "number" }).primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => liveSessions.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("support_telegram_messages_session_idx").on(table.sessionId)],
 );
 
 export const liveSessionsRelations = relations(liveSessions, ({ one }) => ({

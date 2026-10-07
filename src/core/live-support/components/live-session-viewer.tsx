@@ -10,12 +10,18 @@ import type { eventWithTime } from "@rrweb/types";
 // um do tamanho da tela gravada (ex.: 720px) — empurrando o conteúdo real
 // para fora da janela visível. Era a causa do "só aparece fundo cinza".
 import "rrweb/dist/style.css";
-import { Maximize2, RefreshCw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, Monitor, RefreshCw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { logger } from "@/core/logger";
 import { getRealtimeChannel, liveSessionChannelName } from "../realtime";
-import { endLiveSession, getFullSnapshot, type ChatMessageDto } from "../actions";
+import {
+  endLiveSession,
+  getFullSnapshot,
+  requestAccessToSession,
+  type ChatMessageDto,
+} from "../actions";
 import { dispatchChatMessage } from "../chat-events";
 import { SupportChatPanel } from "./support-chat-panel";
 
@@ -54,15 +60,24 @@ function clearHighlight(el: StyledElement) {
 export function LiveSessionViewer({
   sessionId,
   initialStatus,
+  initialScreenRequested = false,
   initialControlGranted,
   onEnded,
 }: {
   sessionId: string;
-  initialStatus: "pending" | "active";
+  initialStatus: "pending" | "active" | "chat";
+  /** Em conversa por texto, a pessoa ainda não respondeu ao pedido de tela. */
+  initialScreenRequested?: boolean;
   initialControlGranted: boolean;
   onEnded: () => void;
 }) {
   const [status, setStatus] = useState(initialStatus);
+  const [screenRequested, setScreenRequested] = useState(initialScreenRequested);
+  // O espelho só passa a ser buscado quando a tela é compartilhada (`active`) —
+  // numa conversa por texto não há quadro algum, e esperar 30 s à toa mostraria
+  // um erro de conexão que não existe.
+  const startPollingRef = useRef<(() => void) | null>(null);
+  const statusAtMountRef = useRef(initialStatus);
   const [controlGranted, setControlGranted] = useState(initialControlGranted);
   const [connectionError, setConnectionError] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
@@ -219,6 +234,7 @@ export function LiveSessionViewer({
     // sem repetir, o espelho nunca mais tenta de novo.
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
     let pollAttempts = 0;
+    let polling = false;
     const MAX_POLL_ATTEMPTS = 40; // ~30s
     async function pollSnapshot() {
       if (replayerRef.current) return;
@@ -228,11 +244,13 @@ export function LiveSessionViewer({
           meta: eventWithTime | null;
           snapshot: eventWithTime;
         };
+        polling = false;
         tryCreateReplayer();
         return;
       }
       pollAttempts += 1;
       if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+        polling = false;
         logger.error("live_support.snapshot_nao_chegou", { sessionId, pollAttempts });
         setConnectionError(true);
         return;
@@ -241,7 +259,14 @@ export function LiveSessionViewer({
         pollTimer = setTimeout(() => void pollSnapshot(), 700);
       }
     }
-    void pollSnapshot();
+    function startPolling() {
+      if (polling || replayerRef.current) return;
+      polling = true;
+      pollAttempts = 0;
+      void pollSnapshot();
+    }
+    startPollingRef.current = startPolling;
+    if (statusAtMountRef.current === "active") startPolling();
 
     // O usuário gravou um quadro completo NOVO (ele reenvia um depois que a
     // tela assenta, e a pedido do botão "Atualizar tela"): recria o espelho a
@@ -253,8 +278,8 @@ export function LiveSessionViewer({
       replayerRef.current = null;
       fetchedSnapshotRef.current = null;
       pendingEventsRef.current = [];
-      pollAttempts = 0;
-      void pollSnapshot();
+      polling = false;
+      startPolling();
     }
 
     channel
@@ -264,6 +289,11 @@ export function LiveSessionViewer({
           onEnded();
         } else if (next === "active") {
           setStatus("active");
+          setScreenRequested(false);
+        } else if (next === "chat") {
+          // A pessoa recusou a tela: a conversa por texto continua.
+          setStatus("chat");
+          setScreenRequested(false);
         }
       })
       .on("broadcast", { event: "control" }, ({ payload }) => {
@@ -308,7 +338,10 @@ export function LiveSessionViewer({
   // disso (pedido do admin, sessão ainda "pending"), tenta criar o
   // Replayer de novo agora que o container acabou de ser montado.
   useEffect(() => {
-    if (status === "active") tryCreateReplayerRef.current();
+    if (status === "active") {
+      startPollingRef.current?.();
+      tryCreateReplayerRef.current();
+    }
   }, [status]);
 
   // Assim que o primeiro quadro chega, descobre o tamanho real da tela
@@ -434,6 +467,18 @@ export function LiveSessionViewer({
     return () => window.removeEventListener("keydown", handleWindowKeyDown);
   }, [status, sessionId]);
 
+  function handleRequestScreen() {
+    startTransition(async () => {
+      const result = await requestAccessToSession(sessionId);
+      if (result.ok) {
+        setScreenRequested(true);
+        toast.success("Pedido enviado. A pessoa precisa aprovar na tela dela.");
+      } else {
+        toast.error(result.message ?? "Não foi possível pedir acesso à tela.");
+      }
+    });
+  }
+
   function handleEnd() {
     startTransition(async () => {
       await endLiveSession(sessionId);
@@ -445,7 +490,13 @@ export function LiveSessionViewer({
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Badge variant={status === "active" ? "secondary" : "outline"}>
-          {status === "active" ? "Ao vivo" : "Aguardando aprovação da pessoa..."}
+          {status === "active"
+            ? "Ao vivo"
+            : status === "chat"
+              ? screenRequested
+                ? "Conversa por texto — aguardando a pessoa liberar a tela..."
+                : "Conversa por texto"
+              : "Aguardando aprovação da pessoa..."}
         </Badge>
         {controlGranted && <Badge>Controle remoto concedido</Badge>}
         {connectionError && (
@@ -503,9 +554,15 @@ export function LiveSessionViewer({
             Atualizar tela
           </Button>
         )}
+        {status === "chat" && !screenRequested && (
+          <Button variant="outline" size="sm" onClick={handleRequestScreen} disabled={isPending}>
+            <Monitor className="h-4 w-4" />
+            Pedir acesso à tela
+          </Button>
+        )}
         <Button variant="destructive" size="sm" onClick={handleEnd} disabled={isPending}>
           <X className="h-4 w-4" />
-          Encerrar sessão
+          {status === "chat" ? "Encerrar conversa" : "Encerrar sessão"}
         </Button>
       </div>
 
@@ -570,7 +627,9 @@ export function LiveSessionViewer({
           Passe o mouse sobre o espelho para usar o controle remoto (mouse e teclado).
         </p>
       )}
-      {status === "active" && <SupportChatPanel sessionId={sessionId} side="admin" />}
+      {(status === "active" || status === "chat") && (
+        <SupportChatPanel sessionId={sessionId} side="admin" />
+      )}
     </div>
   );
 }

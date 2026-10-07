@@ -45,6 +45,12 @@ export function SupportInbox({ initialRequests }: { initialRequests: SupportRequ
   }, []);
 
   function handle(request: SupportRequestItem) {
+    // Conversa por texto em andamento: só abre a ficha, onde está a caixa de
+    // conversa e o botão "Pedir acesso à tela".
+    if (request.status === "chat") {
+      window.location.assign(`/admin/organizacoes/${request.organizationId}`);
+      return;
+    }
     startTransition(async () => {
       const result =
         request.status === "pending"
@@ -89,12 +95,20 @@ export function SupportInbox({ initialRequests }: { initialRequests: SupportRequ
                   {r.organizationName}
                 </ActionLink>
                 <Badge variant={r.status === "pending" ? "default" : "secondary"}>
-                  {r.status === "pending" ? "Esperando agora" : "Sem atendimento"}
+                  {r.status === "pending"
+                    ? "Esperando agora"
+                    : r.status === "chat"
+                      ? "Conversa por texto"
+                      : "Sem atendimento"}
                 </Badge>
               </p>
             </div>
             <Button size="sm" onClick={() => handle(r)} disabled={isPending}>
-              {r.status === "pending" ? "Atender agora" : "Pedir acesso à tela"}
+              {r.status === "pending"
+                ? "Atender agora"
+                : r.status === "chat"
+                  ? "Abrir conversa"
+                  : "Pedir acesso à tela"}
             </Button>
           </div>
         ))}

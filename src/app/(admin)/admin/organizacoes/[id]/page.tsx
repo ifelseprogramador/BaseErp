@@ -15,6 +15,7 @@ import { OrgStatusToggle } from "@/core/admin/components/org-status-toggle";
 import { ImpersonateButton } from "@/core/admin/components/impersonate-button";
 import { BillingForm } from "@/core/admin/components/billing-form";
 import { SeatsForm } from "@/core/admin/components/seats-form";
+import { OrgSupportWaitForm } from "@/core/admin/components/org-support-wait-form";
 import { ModuleToggleList } from "@/core/admin/components/module-toggle-list";
 import { HardDeleteForm } from "@/core/admin/components/hard-delete-form";
 import { ResetMemberPasswordButton } from "@/core/admin/components/reset-member-password-button";
@@ -83,10 +84,14 @@ export default async function AdminOrganizationDetailPage({
         organizationId={org.id}
         targets={supportTargets}
         initialSession={
-          openSession && (openSession.status === "pending" || openSession.status === "active")
+          openSession &&
+          (openSession.status === "pending" ||
+            openSession.status === "active" ||
+            openSession.status === "chat")
             ? {
                 id: openSession.id,
                 status: openSession.status,
+                screenRequested: openSession.screenRequested,
                 controlGranted: openSession.controlGranted,
               }
             : null
@@ -104,6 +109,15 @@ export default async function AdminOrganizationDetailPage({
             billingNotes={org.billingNotes}
             action={updateBillingWithId}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Atendimento de suporte</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OrgSupportWaitForm organizationId={org.id} initialSeconds={org.supportWaitSeconds} />
         </CardContent>
       </Card>
 

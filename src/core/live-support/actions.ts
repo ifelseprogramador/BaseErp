@@ -12,12 +12,16 @@ import {
   memberships,
   organizations,
   platformAdmins,
-  platformSettings,
 } from "@/db/schema";
 import { recordAudit } from "@/core/admin/audit";
 import { expireStalePendingSessions } from "./queries";
 import { sendBroadcast as broadcast } from "@/core/supabase/realtime-sender";
-import { sendTelegramMessage, sendTelegramMessageDetailed } from "@/core/telegram";
+import {
+  getTelegramWebhookInfo,
+  sendTelegramMessageDetailed,
+  setTelegramWebhook,
+} from "@/core/telegram";
+import { announceScreenStarted, forwardUserMessage, sendToOwner } from "./telegram-bridge";
 import type { ActionResult } from "@/core/action-result";
 import {
   adminSupportInboxChannelName,
@@ -35,7 +39,7 @@ import {
   normalizeChatMessage,
 } from "./wait";
 
-const OPEN_STATUSES = ["pending", "active"] as const;
+const OPEN_STATUSES = ["pending", "active", "chat"] as const;
 
 interface SessionActionResult extends ActionResult {
   sessionId?: string;
@@ -65,10 +69,12 @@ async function isAnyAdminOnline(db: Database): Promise<boolean> {
   return Boolean(row?.online);
 }
 
-async function getWaitSeconds(db: Database): Promise<number> {
+/** Espera por atendimento DESTA organização (`organizations.support_wait_seconds`). */
+async function getWaitSeconds(db: Database, organizationId: string): Promise<number> {
   const [row] = await db
-    .select({ seconds: platformSettings.supportWaitSeconds })
-    .from(platformSettings)
+    .select({ seconds: organizations.supportWaitSeconds })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
     .limit(1);
   return clampWaitSeconds(row?.seconds ?? DEFAULT_SUPPORT_WAIT_SECONDS);
 }
@@ -88,7 +94,10 @@ async function alertMissedRequest(input: {
   subjectUserId: string;
 }) {
   const origin = siteOrigin();
-  await sendTelegramMessage(
+  // `sendToOwner` guarda o id da mensagem do Telegram: é por ele que a RESPOSTA
+  // do dono ("Responder" no alerta) volta para esta sessão.
+  await sendToOwner(
+    input.sessionId,
     formatSupportAlert({
       userName: input.userName,
       organizationName: input.organizationName,
@@ -175,7 +184,7 @@ export async function requestSupportAccess(
 
 export interface CallForSupportResult extends SessionActionResult {
   /** `pending` = esperando atendimento; `missed` = ninguém online agora. */
-  status?: "pending" | "active" | "missed";
+  status?: "pending" | "active" | "missed" | "chat";
   /** Segundos de espera (só quando `pending`). */
   waitSeconds?: number;
   /** ISO do fim da espera (só quando `pending`). */
@@ -237,7 +246,7 @@ export async function callForSupport(): Promise<CallForSupportResult> {
     }
 
     const online = await isAnyAdminOnline(db);
-    const waitSeconds = await getWaitSeconds(db);
+    const waitSeconds = await getWaitSeconds(db, organizationId);
     const expiresAt = online ? computeExpiresAt(new Date(), waitSeconds) : null;
 
     const [created] = await db
@@ -268,7 +277,7 @@ export async function callForSupport(): Promise<CallForSupportResult> {
     return {
       ok: true,
       sessionId: outcome.existing.id,
-      status: outcome.existing.status as "pending" | "active",
+      status: outcome.existing.status as "pending" | "active" | "chat",
       expiresAt: outcome.existing.expiresAt?.toISOString(),
     };
   }
@@ -379,7 +388,28 @@ export async function requestAccessToSession(sessionId: string): Promise<Session
       .from(liveSessions)
       .where(eq(liveSessions.id, sessionId))
       .limit(1);
-    if (!session || session.status !== "missed" || !session.subjectUserId) return null;
+    if (!session || !session.subjectUserId) return null;
+
+    // Conversa por texto em andamento (veio do Telegram): NÃO fecha a conversa;
+    // só marca que o suporte quer ver a tela — a caixa da pessoa mostra o
+    // aviso de consentimento e, se ela aprovar, a MESMA sessão vira `active`
+    // com o mesmo histórico de mensagens.
+    if (session.status === "chat") {
+      if (session.screenRequested) return { session, fromChat: true as const };
+      await db
+        .update(liveSessions)
+        .set({ screenRequested: true, adminUserId: userId })
+        .where(eq(liveSessions.id, sessionId));
+      await recordAudit(db, {
+        actorUserId: userId,
+        organizationId: session.organizationId,
+        action: "live_support.solicitar_tela_na_conversa",
+        metadata: { sessionId, subjectUserId: session.subjectUserId },
+      });
+      return { session, fromChat: true as const };
+    }
+
+    if (session.status !== "missed") return null;
 
     // Não abre se a pessoa já tem outra sessão aberta.
     const [other] = await db
@@ -410,20 +440,28 @@ export async function requestAccessToSession(sessionId: string): Promise<Session
       action: "live_support.solicitar_apos_pedido",
       metadata: { sessionId, subjectUserId: session.subjectUserId },
     });
-    return session;
+    return { session, fromChat: false as const };
   });
 
-  if (!result || !result.subjectUserId) {
+  if (!result || !result.session.subjectUserId) {
     return {
       ok: false,
       message: "Pedido não encontrado, já respondido ou pessoa com outra sessão aberta.",
     };
   }
+  const { session: opened, fromChat } = result;
 
-  log.warn("live_support.solicitar_apos_pedido", { sessionId });
-  await broadcast(userSupportChannelName(result.subjectUserId), "request", { sessionId });
+  log.warn("live_support.solicitar_apos_pedido", { sessionId, fromChat });
+  if (fromChat) {
+    // A pessoa já está na conversa: o aviso chega pelo canal da própria sessão.
+    await broadcast(liveSessionChannelName(sessionId), "screen-request", {});
+  } else {
+    await broadcast(userSupportChannelName(opened.subjectUserId as string), "request", {
+      sessionId,
+    });
+  }
 
-  revalidatePath(`/admin/organizacoes/${result.organizationId}`);
+  revalidatePath(`/admin/organizacoes/${opened.organizationId}`);
   revalidatePath("/admin");
   return { ok: true, sessionId };
 }
@@ -442,18 +480,19 @@ export async function approveSupportSession(sessionId: string): Promise<ActionRe
       !session ||
       session.organizationId !== organizationId ||
       session.subjectUserId !== userId ||
-      session.status !== "pending"
+      !(session.status === "pending" || (session.status === "chat" && session.screenRequested))
     ) {
       return false;
     }
 
+    const fromChat = session.status === "chat";
     await db
       .update(liveSessions)
-      .set({ status: "active", startedAt: new Date() })
+      .set({ status: "active", startedAt: new Date(), screenRequested: false })
       .where(eq(liveSessions.id, sessionId));
 
     await recordAudit(db, { actorUserId: userId, organizationId, action: "live_support.aprovar" });
-    return true;
+    return { fromChat };
   });
 
   if (!ok) {
@@ -462,6 +501,25 @@ export async function approveSupportSession(sessionId: string): Promise<ActionRe
 
   log.info("live_support.aprovar", { sessionId });
   await broadcast(liveSessionChannelName(sessionId), "status", { status: "active" });
+
+  // Veio de uma conversa que passava pelo Telegram: avisa o dono de que ela
+  // mudou para o painel (a pessoa não percebe nada — é a mesma caixa).
+  if (ok.fromChat) {
+    const user = await getSession();
+    const [org] = await withDb((db) =>
+      db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
+        .limit(1),
+    );
+    await announceScreenStarted({
+      sessionId,
+      userName:
+        (user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? "O usuário",
+      organizationName: org?.name ?? "Organização",
+    });
+  }
 
   return { ok: true };
 }
@@ -480,14 +538,26 @@ export async function declineSupportSession(sessionId: string): Promise<ActionRe
       !session ||
       session.organizationId !== organizationId ||
       session.subjectUserId !== userId ||
-      session.status !== "pending"
+      !(session.status === "pending" || (session.status === "chat" && session.screenRequested))
     ) {
       return false;
     }
 
-    await db.update(liveSessions).set({ status: "declined" }).where(eq(liveSessions.id, sessionId));
+    // Numa conversa por texto, recusar a TELA não encerra a conversa.
+    const fromChat = session.status === "chat";
+    if (fromChat) {
+      await db
+        .update(liveSessions)
+        .set({ screenRequested: false })
+        .where(eq(liveSessions.id, sessionId));
+    } else {
+      await db
+        .update(liveSessions)
+        .set({ status: "declined" })
+        .where(eq(liveSessions.id, sessionId));
+    }
     await recordAudit(db, { actorUserId: userId, organizationId, action: "live_support.recusar" });
-    return true;
+    return { fromChat };
   });
 
   if (!ok) {
@@ -495,7 +565,9 @@ export async function declineSupportSession(sessionId: string): Promise<ActionRe
   }
 
   log.info("live_support.recusar", { sessionId });
-  await broadcast(liveSessionChannelName(sessionId), "status", { status: "declined" });
+  await broadcast(liveSessionChannelName(sessionId), "status", {
+    status: ok.fromChat ? "chat" : "declined",
+  });
 
   return { ok: true };
 }
@@ -704,6 +776,15 @@ export async function endLiveSession(sessionId: string): Promise<ActionResult> {
 
   await broadcast(liveSessionChannelName(sessionId), "status", { status: "ended" });
 
+  // Conversa por texto encerrada pela PESSOA: o dono, que a acompanha pelo
+  // Telegram, precisa saber que acabou (não há outra tela dele mostrando isso).
+  if (result.session.status === "chat" && user.id === result.session.subjectUserId) {
+    await sendToOwner(
+      sessionId,
+      `🔚 ${(user.user_metadata?.display_name as string | undefined) ?? user.email ?? "O usuário"} encerrou a conversa.`,
+    );
+  }
+
   const organizationId = result.session.organizationId;
   const orgExists = await runWithUserContext(user.id, async (db) => {
     const [org] = await db
@@ -763,7 +844,7 @@ export async function sendSupportMessage(
       .from(liveSessions)
       .where(eq(liveSessions.id, sessionId))
       .limit(1);
-    if (!session || session.status !== "active") return null;
+    if (!session || !(session.status === "active" || session.status === "chat")) return null;
 
     const role: "admin" | "user" | null =
       session.subjectUserId === user.id
@@ -783,15 +864,37 @@ export async function sendSupportMessage(
         body,
       })
       .returning();
-    return row;
+    return { row, status: session.status, organizationId: session.organizationId, role };
   });
 
-  if (!outcome) return { ok: false, message: "Não foi possível enviar: a sessão não está ativa." };
+  if (!outcome) {
+    return { ok: false, message: "Não foi possível enviar: a conversa não está aberta." };
+  }
 
-  const message = toDto(outcome);
+  const message = toDto(outcome.row);
   // Só avisa o outro lado; a mensagem em si já está gravada e a tela dele a
   // adiciona direto do payload (pequeno), sem reler tudo.
   await broadcast(liveSessionChannelName(sessionId), "message", message);
+
+  // Conversa só por texto (veio do Telegram): o que a PESSOA escreve chega ao
+  // Telegram do dono. Com a tela compartilhada (`active`) a conversa já é no
+  // painel e nada vai ao Telegram.
+  if (outcome.status === "chat" && outcome.role === "user") {
+    const org = await runWithUserContext(user.id, async (db) => {
+      const [row] = await db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, outcome.organizationId))
+        .limit(1);
+      return row;
+    });
+    await forwardUserMessage({
+      sessionId,
+      userName: (user.user_metadata?.display_name as string | undefined) ?? user.email ?? "Usuário",
+      organizationName: org?.name ?? "Organização",
+      body: message.body,
+    });
+  }
   return { ok: true, chatMessage: message };
 }
 
@@ -828,29 +931,39 @@ export async function adminHeartbeat(): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Quanto o usuário espera por atendimento antes de o pedido virar "perdido" (5–300 s). */
-export async function updateSupportWaitSeconds(seconds: number): Promise<ActionResult> {
+/**
+ * Quanto os usuários DESTA organização esperam por atendimento antes de o
+ * pedido virar "sem atendimento" e o Telegram avisar (5–300 s). Por
+ * organização, não global — o dono da plataforma combina um prazo com cada
+ * cliente.
+ */
+export async function updateSupportWaitSeconds(
+  organizationId: string,
+  seconds: number,
+): Promise<ActionResult> {
   const { userId, log, withDb } = await requireAdmin();
   const value = clampWaitSeconds(seconds);
 
-  await withDb(async (db) => {
-    await db
-      .insert(platformSettings)
-      .values({ id: "singleton", supportWaitSeconds: value })
-      .onConflictDoUpdate({
-        target: platformSettings.id,
-        set: { supportWaitSeconds: value, updatedAt: new Date() },
-      });
+  const updated = await withDb(async (db) => {
+    const rows = await db
+      .update(organizations)
+      .set({ supportWaitSeconds: value, updatedAt: new Date() })
+      .where(eq(organizations.id, organizationId))
+      .returning({ id: organizations.id });
+    if (rows.length === 0) return false;
     await recordAudit(db, {
       actorUserId: userId,
-      action: "plataforma.suporte_espera",
+      organizationId,
+      action: "organizacao.suporte_espera",
       metadata: { seconds: value },
     });
+    return true;
   });
+  if (!updated) return { ok: false, message: "Organização não encontrada." };
 
-  log.info("admin.suporte.espera", { seconds: value });
-  revalidatePath("/admin");
-  return { ok: true };
+  log.info("admin.suporte.espera", { organizationId, seconds: value });
+  revalidatePath(`/admin/organizacoes/${organizationId}`);
+  return { ok: true, message: undefined };
 }
 
 /**
@@ -873,4 +986,73 @@ export async function sendTelegramTest(): Promise<ActionResult> {
     network: "Não foi possível falar com o Telegram agora. Tente de novo em instantes.",
   } as const;
   return { ok: false, message: messages[result.reason] };
+}
+
+/**
+ * Registra o webhook do bot para as respostas do dono chegarem à nossa rota
+ * (`/api/telegram/webhook`). Exige `NEXT_PUBLIC_SITE_URL` pública (HTTPS — o
+ * Telegram não alcança `localhost`) e `TELEGRAM_WEBHOOK_SECRET`.
+ */
+export async function registerTelegramWebhook(): Promise<ActionResult> {
+  const { log } = await requireAdmin();
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const origin = siteOrigin();
+  if (!secret) {
+    return {
+      ok: false,
+      message:
+        "Defina TELEGRAM_WEBHOOK_SECRET nas variáveis de ambiente (uma senha longa e aleatória).",
+    };
+  }
+  if (!origin || !origin.startsWith("https://")) {
+    return {
+      ok: false,
+      message:
+        "Defina NEXT_PUBLIC_SITE_URL com o endereço público HTTPS do sistema (em teste local, use um túnel como o ngrok) — o Telegram não alcança localhost.",
+    };
+  }
+  const result = await setTelegramWebhook(`${origin}/api/telegram/webhook`, secret);
+  if (!result.ok) {
+    log.warn("admin.telegram.webhook_falhou", { reason: result.reason });
+    return {
+      ok: false,
+      message:
+        result.reason === "not_configured"
+          ? "Faltam TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID."
+          : `O Telegram recusou${result.detail ? `: ${result.detail}` : ""}.`,
+    };
+  }
+  log.info("admin.telegram.webhook_registrado");
+  return { ok: true };
+}
+
+export interface TelegramWebhookStatus extends ActionResult {
+  url?: string;
+  pendingUpdateCount?: number;
+  lastErrorMessage?: string;
+  /** O endereço registrado é o esperado para este sistema? */
+  matchesThisSite?: boolean;
+}
+
+/** Estado atual do webhook no Telegram (para o card do `/admin`). */
+export async function getTelegramWebhookStatus(): Promise<TelegramWebhookStatus> {
+  await requireAdmin();
+  const result = await getTelegramWebhookInfo();
+  if (!result.ok) {
+    return {
+      ok: false,
+      message:
+        result.reason === "not_configured"
+          ? "Faltam TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID."
+          : "Não foi possível consultar o Telegram agora.",
+    };
+  }
+  const origin = siteOrigin();
+  return {
+    ok: true,
+    url: result.info.url,
+    pendingUpdateCount: result.info.pendingUpdateCount,
+    lastErrorMessage: result.info.lastErrorMessage,
+    matchesThisSite: Boolean(origin) && result.info.url === `${origin}/api/telegram/webhook`,
+  };
 }

@@ -913,3 +913,55 @@ tempo real (`chat-events.ts`) — por isso avisa mesmo recolhida; a lista/campo
   descrição do Telegram, que nunca traz o token —, rede). Alimenta o botão "Enviar
   mensagem de teste" do `/admin`, para validar o token e o chat id sem esperar um
   pedido de suporte de verdade.
+
+## 2026-10-07 — Suporte: conversa pelo Telegram e espera por organização
+
+**Pedido:** (1) o dono responder pelo Telegram e a pessoa receber na caixa de
+conversa do sistema, com a conversa migrando para o painel quando a tela é
+compartilhada, sem a pessoa perceber troca de canal; (2) o tempo de espera ser de
+cada organização.
+
+**Modelo:** a SESSÃO é a conversa. `missed` → (dono responde no Telegram) →
+`chat` (só texto, sem tela) → (a pessoa aprova ver a tela) → `active`. Mesma
+`live_sessions.id` e mesmo `live_session_messages` o tempo todo: o histórico
+atravessa a mudança. Em `chat`, o que a pessoa escreve é encaminhado ao Telegram
+do dono e o que o dono responde ("Responder") chega na caixa dela; ao virar
+`active`, o Telegram recebe "a conversa continua no painel" e deixa de ser o
+canal (resposta posterior no Telegram recebe o lembrete). A tela continua exigindo
+o consentimento explícito da pessoa (`live_sessions.screen_requested` + modal),
+agora também a partir de uma conversa por texto.
+
+**Telegram → sistema** (`/api/telegram/webhook`, `live-support/telegram-bridge.ts`):
+
+- Barreiras, nesta ordem: segredo do cabeçalho (`TELEGRAM_WEBHOOK_SECRET`,
+  comparação em tempo constante) → o chat é o do dono (`TELEGRAM_CHAT_ID`; outra
+  pessoa que fale com o bot é ignorada em silêncio) → só então vira ação.
+- A resposta é gravada como o admin da plataforma (`TELEGRAM_ADMIN_USER_ID` ou o
+  mais antigo) via `runWithUserContext`, então a RLS vale também aqui.
+- Qual sessão: a da mensagem respondida (`support_telegram_messages` mapeia cada
+  mensagem que o servidor mandou ao Telegram → sessão); sem "Responder", a única
+  conversa aberta; com várias, o bot pede para responder a uma específica.
+- O id de cada mensagem do dono também entra no mapa: é a trava contra o
+  Telegram reenviando o mesmo update (chave primária).
+- `/fim` encerra a conversa. A decisão do que fazer é a função pura
+  `planOwnerReply` (testada).
+- Rota sempre devolve 200 depois da primeira barreira: o Telegram reenvia em erro,
+  e uma resposta duplicada na conversa é pior que uma perdida.
+- Registro do webhook pelo botão "Ativar respostas pelo Telegram" em `/admin`
+  (precisa de `NEXT_PUBLIC_SITE_URL` HTTPS; o Telegram não alcança localhost).
+
+**Espera por organização:** `organizations.support_wait_seconds` (5–300, padrão
+30; só o dono da plataforma altera — gatilho; campo na ficha da organização).
+`platform_settings` ficou sem uso (mantida: a migration custom anterior cria
+políticas nela e uma migration que a apagasse quebraria instalações novas, em que
+as custom rodam depois de todas as do drizzle).
+
+**Correção de passagem:** `/api/cron/*` não estava em `PUBLIC_PATHS` do proxy —
+um GET sem sessão (o Vercel Cron) era redirecionado a `/login` antes de chegar na
+rota, então o backup diário e a limpeza de documentos provavelmente nunca rodavam
+em produção. Agora `isPublicPath` (testada) libera `/api/cron/` e o webhook; cada
+rota se autentica por conta própria (`CRON_SECRET`, segredo do Telegram).
+
+Migrations: drizzle `0008_support_telegram_chat`, custom
+`0012_support_telegram_chat`. Validado num Postgres em memória (17 cenários) e 54
+testes (regras puras do Telegram, rota do webhook, proxy, painel).
