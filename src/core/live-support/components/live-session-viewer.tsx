@@ -467,6 +467,22 @@ export function LiveSessionViewer({
     sendControl({ type: "click", xFrac, yFrac });
   }
 
+  // O React registra toque como "passivo", e só um listener nativo não passivo
+  // consegue impedir que o navegador role o MEU lado quando são dois dedos.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    function stopNativeScroll(e: TouchEvent) {
+      if (controlGrantedRef.current && e.touches.length >= 2 && e.cancelable) e.preventDefault();
+    }
+    el.addEventListener("touchstart", stopNativeScroll, { passive: false });
+    el.addEventListener("touchmove", stopNativeScroll, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", stopNativeScroll);
+      el.removeEventListener("touchmove", stopNativeScroll);
+    };
+  }, [status]);
+
   function getIframe(): HTMLIFrameElement | null {
     return containerRef.current?.querySelector("iframe") ?? null;
   }
@@ -484,12 +500,22 @@ export function LiveSessionViewer({
     state.lastSent = now;
   }
 
+  // Um dedo rola o MEU lado (o espelho e a página do dono, pelo navegador); dois
+  // dedos rolam a tela DA PESSOA. O ponto de referência é o meio dos dois dedos.
+  function touchMidpoint(e: React.TouchEvent<HTMLDivElement>) {
+    const [a, b] = [e.touches[0], e.touches[1]];
+    return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+  }
+
   function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
-    if (!controlGrantedRef.current || e.touches.length !== 1) return;
-    const t = e.touches[0];
+    if (!controlGrantedRef.current || e.touches.length !== 2) {
+      touchRef.current = null;
+      return;
+    }
+    const mid = touchMidpoint(e);
     touchRef.current = {
-      x: t.clientX,
-      y: t.clientY,
+      x: mid.x,
+      y: mid.y,
       moved: false,
       lastSent: 0,
       pendingX: 0,
@@ -499,15 +525,15 @@ export function LiveSessionViewer({
 
   function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
     const state = touchRef.current;
-    if (!state || e.touches.length !== 1) return;
-    const t = e.touches[0];
-    const dx = state.x - t.clientX;
-    const dy = state.y - t.clientY;
+    if (!state || e.touches.length !== 2) return;
+    const t = touchMidpoint(e);
+    const dx = state.x - t.x;
+    const dy = state.y - t.y;
     // Abaixo de ~8 px ainda é um toque, não um arrasto.
     if (!state.moved && Math.hypot(dx, dy) < TOUCH_DRAG_THRESHOLD_PX) return;
     state.moved = true;
-    state.x = t.clientX;
-    state.y = t.clientY;
+    state.x = t.x;
+    state.y = t.y;
     state.pendingX += dx;
     state.pendingY += dy;
     const now = Date.now();
@@ -515,6 +541,7 @@ export function LiveSessionViewer({
   }
 
   function handleTouchEnd() {
+    // Com um dedo ainda na tela, o gesto de dois dedos já acabou.
     const state = touchRef.current;
     touchRef.current = null;
     if (!state?.moved) return;
@@ -752,9 +779,10 @@ export function LiveSessionViewer({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          // Com o controle liberado, o arrasto do dedo rola a página DELA (não o
-          // espelho): o navegador não pode tomar o gesto para si.
-          style={controlGranted ? { touchAction: "none" } : undefined}
+          // Com o controle liberado, um dedo continua rolando o meu lado (pelo
+          // navegador) e dois dedos rolam a página DELA; `pan-x pan-y` só impede o
+          // zoom de pinça, que concorreria com o gesto de dois dedos.
+          style={controlGranted ? { touchAction: "pan-x pan-y" } : undefined}
           className="bg-muted relative h-[75vh] w-full overflow-auto rounded-lg border [&_iframe]:pointer-events-none"
         >
           {!hasFrame && !connectionError && (

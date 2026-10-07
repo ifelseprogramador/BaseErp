@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.10.1",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "No controle remoto pelo celular, um dedo agora rola o seu lado (a tela do dono) e dois dedos rolam a tela da pessoa — antes qualquer arrasto só rolava a tela dela.",
+      },
+    ],
+  },
+  {
     version: "0.10.0",
     date: "2026-10-07",
     changes: [

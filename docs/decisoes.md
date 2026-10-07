@@ -1081,3 +1081,15 @@ Três defeitos do teste real no celular, todos no viewer do dono:
    300 px da página dela (também no computador).
 
 Limite: o texto é editado no FIM do campo (não há cursor remoto no meio da frase).
+
+## 2026-10-07 — Rolagem por toque: um dedo é do dono, dois dedos são da pessoa
+
+Com o controle liberado, arrastar UM dedo no espelho só rolava a tela da pessoa e o dono não
+conseguia mais rolar o próprio lado (nem a página, nem o espelho). Agora: **um dedo** segue o
+comportamento nativo (rola o espelho/a página do dono, `touch-action: pan-x pan-y`, que também
+desliga o zoom de pinça); **dois dedos** mandam `scroll` para a tela da pessoa, usando o ponto
+médio dos dois dedos (mesma lógica de ÷ zoom, 40 ms e trava de clique). Como o React registra
+toque como passivo, um listener nativo não passivo faz `preventDefault` em `touchstart`/`touchmove`
+com 2+ dedos, para o navegador não rolar o lado do dono ao mesmo tempo. Limite: se o primeiro
+dedo já começou a rolar nativamente antes de o segundo encostar, esse gesto não é cancelável —
+basta soltar e repetir com os dois dedos juntos.

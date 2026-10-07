@@ -195,20 +195,20 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
   });
 
   describe("rolar a tela da pessoa", () => {
-    it("arrastar o dedo para cima rola a página dela para baixo", () => {
+    it("arrastar DOIS dedos para cima rola a página dela para baixo", () => {
       const container = renderActive();
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }] });
+      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 100, clientY: 300 }] });
+      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }, { clientX: 100, clientY: 200 }] });
 
       expect(controlsSent()).toContainEqual({ type: "scroll", deltaX: 0, deltaY: 100 });
     });
 
-    it("arrastar para baixo rola para cima; para os lados rola na horizontal", () => {
+    it("dois dedos para baixo rolam para cima; para os lados rola na horizontal", () => {
       const container = renderActive();
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 200, clientY: 100 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 150, clientY: 160 }] });
+      fireEvent.touchStart(container, { touches: [{ clientX: 200, clientY: 100 }, { clientX: 200, clientY: 100 }] });
+      fireEvent.touchMove(container, { touches: [{ clientX: 150, clientY: 160 }, { clientX: 150, clientY: 160 }] });
 
       expect(controlsSent()).toContainEqual({ type: "scroll", deltaX: 50, deltaY: -60 });
     });
@@ -216,8 +216,8 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
     it("movimento mínimo é um toque, não uma rolagem", () => {
       const container = renderActive();
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 100 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 102, clientY: 103 }] });
+      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 100 }, { clientX: 100, clientY: 100 }] });
+      fireEvent.touchMove(container, { touches: [{ clientX: 102, clientY: 103 }, { clientX: 102, clientY: 103 }] });
       fireEvent.touchEnd(container);
 
       expect(controlsSent().filter((c) => c.type === "scroll")).toHaveLength(0);
@@ -227,8 +227,8 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
       const container = renderActive();
       mountIframe(container, { tagName: "BUTTON" });
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }] });
+      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 100, clientY: 300 }] });
+      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }, { clientX: 100, clientY: 200 }] });
       fireEvent.touchEnd(container);
       fireEvent.click(container, { clientX: 100, clientY: 200 });
 
@@ -239,7 +239,7 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
       const container = renderActive();
       mountIframe(container, { tagName: "BUTTON" });
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 100 }] });
+      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 100 }, { clientX: 100, clientY: 100 }] });
       fireEvent.touchEnd(container);
       fireEvent.click(container, { clientX: 100, clientY: 100 });
 
@@ -249,16 +249,39 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
     it("sem o controle liberado, arrastar não manda nada (e o espelho rola só localmente)", () => {
       const container = renderActive(false);
 
-      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }] });
-      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }] });
+      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }, { clientX: 100, clientY: 300 }] });
+      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }, { clientX: 100, clientY: 200 }] });
 
       expect(controlsSent()).toHaveLength(0);
       expect(container.style.touchAction).toBe("");
     });
 
-    it("com o controle liberado, o navegador não toma o gesto de rolagem para si", () => {
+    it("com o controle liberado, um dedo segue rolando o lado do dono (pan) e o zoom de pinça fica desligado", () => {
       const container = renderActive();
-      expect(container.style.touchAction).toBe("none");
+      expect(container.style.touchAction).toBe("pan-x pan-y");
+    });
+
+    it("um dedo só nunca rola a tela da pessoa (rola o lado do dono)", () => {
+      const container = renderActive();
+
+      fireEvent.touchStart(container, { touches: [{ clientX: 100, clientY: 300 }] });
+      fireEvent.touchMove(container, { touches: [{ clientX: 100, clientY: 200 }] });
+      fireEvent.touchEnd(container);
+
+      expect(controlsSent().filter((c) => c.type === "scroll")).toHaveLength(0);
+    });
+
+    it("dois dedos não deixam o navegador rolar o lado do dono", () => {
+      const container = renderActive();
+      const two = [
+        { clientX: 100, clientY: 300 },
+        { clientX: 120, clientY: 300 },
+      ];
+      const ev = new Event("touchmove", { cancelable: true, bubbles: true });
+      Object.defineProperty(ev, "touches", { value: two });
+      container.dispatchEvent(ev);
+
+      expect(ev.defaultPrevented).toBe(true);
     });
 
     it("os botões de rolar andam a página da pessoa para cima e para baixo", () => {
