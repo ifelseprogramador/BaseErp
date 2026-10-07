@@ -137,6 +137,21 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: true }));
   });
 
+  describe("espelho", () => {
+    it("o replay roda sem animações (janelas que entram com fade não ficam invisíveis)", async () => {
+      const { Replayer } = await import("rrweb");
+      renderActive();
+      const calls = vi.mocked(Replayer).mock.calls;
+      // O Replayer só é criado quando o instantâneo chega; aqui basta conferir a
+      // regra exportada, que é a que vai em `insertStyleRules`.
+      const { REPLAY_NO_ANIMATION_CSS } =
+        await import("@/core/live-support/components/live-session-viewer");
+      expect(REPLAY_NO_ANIMATION_CSS).toContain("animation: none !important");
+      expect(REPLAY_NO_ANIMATION_CSS).toContain("transition: none !important");
+      void calls;
+    });
+  });
+
   describe("teclado", () => {
     it("tocar num campo de texto abre o teclado já com o texto que o campo tem", () => {
       const container = renderActive();

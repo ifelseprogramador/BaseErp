@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.14.1",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "No controle remoto, janelas e avisos que aparecem na tela da pessoa (como a pergunta de salvar alterações) agora aparecem no espelho do dono — antes ficavam invisíveis por causa da animação.",
+      },
+    ],
+  },
+  {
     version: "0.14.0",
     date: "2026-10-07",
     changes: [

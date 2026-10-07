@@ -1170,3 +1170,11 @@ O mesmo `LoginHistoryCard` aparece na ficha de cada organização (`organization
 `memberships`), sem coluna nova: uma pessoa em duas organizações aparece nas duas, e quem saiu da
 equipe deixa de aparecer na ficha (continua no geral). "Limpar tudo" na ficha apaga só os acessos
 dessas pessoas — o que também some do geral, pois é o mesmo registro.
+
+## 2026-10-07 — Espelho sem animações (a pergunta de "alterações não salvas" aparecia invisível)
+
+Num Chromium real, com o CSS do app, a janela "Alterações não salvas" existia no espelho (rrweb) mas
+com `opacity: 0`: o Dialog entra com `animate-in fade-in-0` e, no replay, a animação fica no começo.
+O mesmo vale para qualquer janela/aviso com animação de entrada. O `Replayer` agora recebe
+`insertStyleRules` com `animation: none; transition: none` (`REPLAY_NO_ANIMATION_CSS`), então tudo
+aparece direto no estado final. Só afeta o espelho do suporte; a tela da pessoa continua animada.

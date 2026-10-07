@@ -63,6 +63,10 @@ function isStyledElement(value: unknown): value is StyledElement {
 }
 
 /** Quanto o dedo precisa se mover para virar um arrasto (e não um toque). */
+/** CSS injetado no espelho para desligar animações (ver `insertStyleRules`). */
+export const REPLAY_NO_ANIMATION_CSS =
+  "*, *::before, *::after { animation: none !important; transition: none !important; }";
+
 const TOUCH_DRAG_THRESHOLD_PX = 8;
 /** Quanto cada botão de rolar anda a página da pessoa (px dela). */
 const SCROLL_BUTTON_STEP_PX = 300;
@@ -174,6 +178,11 @@ export function LiveSessionViewer({
         // o FECHAVA 100 ms depois: o teclado aparecia e sumia. O destaque do
         // campo focado continua (vem do evento, não do foco real).
         triggerFocus: false,
+        // Sem animações no espelho: janelas e avisos que "entram" com fade/zoom
+        // (ex.: a pergunta "Alterações não salvas") chegam com a animação no
+        // início — opacidade 0 — e, no espelho, ela não termina; a janela existia
+        // no DOM mas ficava invisível. Aqui tudo aparece direto no estado final.
+        insertStyleRules: [REPLAY_NO_ANIMATION_CSS],
       });
       // `startLive()` sem argumento usa `Date.now()` como "baselineTime":
       // eventos com timestamp anterior a isso (o instantâneo inicial e o
