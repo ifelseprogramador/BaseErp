@@ -1,9 +1,10 @@
 import "server-only";
 import { desc, eq, ilike } from "drizzle-orm";
+
 import type { Database } from "@/core/db";
 import { getAuditLogForOrg } from "@/core/admin/audit";
 import { getUserDisplayInfoByIds } from "@/core/user-lookup";
-import { memberships, organizationModuleSettings, organizations } from "@/db/schema";
+import { loginEvents, memberships, organizationModuleSettings, organizations } from "@/db/schema";
 
 export async function listOrganizationsForAdmin(db: Database, search?: string) {
   const term = search?.trim();
@@ -69,4 +70,9 @@ export async function getOrganizationForAdmin(db: Database, organizationId: stri
       actorName: displayInfoById.get(a.actorUserId)?.name ?? a.actorUserId,
     })),
   };
+}
+
+/** Últimos acessos (logins) de toda a plataforma, do mais recente ao mais antigo. */
+export async function listLoginEvents(db: Database, limit = 200) {
+  return db.select().from(loginEvents).orderBy(desc(loginEvents.createdAt)).limit(limit);
 }

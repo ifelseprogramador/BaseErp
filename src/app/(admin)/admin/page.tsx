@@ -15,20 +15,22 @@ import {
 import { SearchBox } from "@/components/search-box";
 import { formatDate } from "@/core/format";
 import { requireAdmin } from "@/core/admin-auth";
-import { listOrganizationsForAdmin } from "@/core/admin/queries";
+import { listLoginEvents, listOrganizationsForAdmin } from "@/core/admin/queries";
 import { listPendingUserRequestsForAdmin } from "@/core/live-support/queries";
 import { isTelegramConfigured } from "@/core/telegram";
 import { SupportSettingsCard } from "@/core/admin/components/support-settings-card";
 import { NewOrganizationForm } from "@/core/admin/components/new-organization-form";
+import { LoginHistoryCard } from "@/core/admin/components/login-history-card";
 import { SupportInbox } from "@/core/admin/components/support-inbox";
 
 export default async function AdminDashboardPage({ searchParams }: PageProps<"/admin">) {
   const { q } = await searchParams;
   const search = typeof q === "string" ? q : undefined;
   const { withDb } = await requireAdmin();
-  const [organizations, pendingRequests] = await Promise.all([
+  const [organizations, pendingRequests, loginEvents] = await Promise.all([
     withDb((db) => listOrganizationsForAdmin(db, search)),
     listPendingUserRequestsForAdmin(),
+    withDb((db) => listLoginEvents(db)),
   ]);
 
   return (
@@ -55,6 +57,8 @@ export default async function AdminDashboardPage({ searchParams }: PageProps<"/a
         telegramConfigured={isTelegramConfigured()}
         webhookSecretConfigured={Boolean(process.env.TELEGRAM_WEBHOOK_SECRET)}
       />
+
+      <LoginHistoryCard entries={loginEvents} />
 
       <SearchBox placeholder="Buscar organização..." />
 

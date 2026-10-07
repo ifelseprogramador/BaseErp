@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.13.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: 'Painel do dono: novo cartão "Histórico de acessos" com cada login (e-mail, organização, data e hora exatas, IP, localização aproximada e aparelho). Dá para apagar um registro ou todos.',
+      },
+    ],
+  },
+  {
     version: "0.12.0",
     date: "2026-10-07",
     changes: [

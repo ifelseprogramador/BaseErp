@@ -64,6 +64,13 @@
       "when": 1791337649096,
       "tag": "0008_support_telegram_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791399021735,
+      "tag": "0009_login_history",
+      "breakpoints": true
     }
   ]
 }

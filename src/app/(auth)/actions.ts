@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from "@/core/supabase/server";
 import { logger } from "@/core/logger";
 import { IMPERSONATION_COOKIE } from "@/core/impersonation";
 import { isPlatformAdmin } from "@/core/platform-admin";
+import { recordLogin } from "@/core/login-history";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Informe o e-mail.").email("E-mail inválido."),
@@ -47,6 +48,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   }
 
   log.info("auth.login.sucesso", { userId: data.user?.id });
+  if (data.user) await recordLogin({ id: data.user.id, email: data.user.email });
 
   // Dono da plataforma cai direto no painel administrativo, não no app
   // da organização — ele pode não ter (ou não usar) nenhuma organização.

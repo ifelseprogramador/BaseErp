@@ -1136,3 +1136,18 @@ FICA na tela — se o servidor recusar um campo, a pessoa vê o erro em vez de p
 ao navegar. Limites: o botão Voltar do navegador/celular (popstate) não é interceptado; depois de um
 envio com erro de validação o formulário só volta a ser vigiado quando a pessoa mexer de novo.
 Formulário novo de cadastro/edição → acrescentar `data-unsaved-guard`.
+
+## 2026-10-07 — Histórico de acessos (logins) para o dono da plataforma
+
+Tabela `login_events` (uma linha por login bem-sucedido): e-mail e nome da organização COPIADOS
+no momento (sem FK — apagar conta/organização não altera o histórico), IP, cidade/região/país,
+User-Agent e horário. Gravada por `core/login-history.ts#recordLogin`, chamada em `login()`
+(`app/(auth)/actions.ts`) depois do sucesso; nunca lança (falhar ao registrar não impede o login).
+RLS (`migrations-custom/*_login_history.sql`): a pessoa só INSERE a própria linha
+(`user_id = current_app_user_id()`); só o dono da plataforma LÊ e APAGA. Cartão "Histórico de
+acessos" em `/admin` (últimos 200) com apagar um/todos (`deleteLoginEvent`/`clearLoginEvents`).
+Localização: vem dos cabeçalhos da hospedagem (`x-vercel-ip-*`, `cf-ipcountry`); rodando local ou
+sem esses cabeçalhos aparece "Rede local"/"Não identificada" — não há consulta a serviço externo
+de geolocalização (enviaria o IP de cada pessoa a terceiros). IP e localização são dados pessoais
+(LGPD): citar na política de privacidade e apagar periodicamente. Só registra login por
+e-mail/senha; sessão renovada automaticamente não gera nova linha.
