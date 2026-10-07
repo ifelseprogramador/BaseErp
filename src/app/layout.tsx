@@ -44,7 +44,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col">
+      {/* `suppressHydrationWarning`: extensões do navegador (ColorZilla, gerenciadores de
+            senha, tradutores) injetam atributos no <body> antes de o React assumir e
+            geravam um aviso de hidratação que não é bug do sistema. */}
+      <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <ThemeProvider>
           <StaleServiceWorkerCleanup />
           <TooltipProvider>{children}</TooltipProvider>

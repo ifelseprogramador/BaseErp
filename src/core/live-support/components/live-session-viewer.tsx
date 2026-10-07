@@ -25,6 +25,7 @@ import {
 } from "../actions";
 import { dispatchChatMessage } from "../chat-events";
 import { SupportChatPanel } from "./support-chat-panel";
+import { RemoteTypingInput } from "./remote-typing-input";
 
 // `target` de um evento "mouse-interaction" do Replayer vem do
 // `contentDocument` do iframe — outro realm de JS, com seu próprio
@@ -140,6 +141,12 @@ export function LiveSessionViewer({
         // mas nunca aparece na tela — era a causa real do espelho travar
         // depois da primeira mutação incremental que chegasse.
         useVirtualDom: false,
+        // NÃO deixa o replay focar campos dentro do iframe do espelho. Ao repetir
+        // o "foco" gravado na pessoa, o rrweb focava o iframe — no celular isso
+        // ABRE o teclado, e o truque que tirava o foco do iframe (abaixo, antes)
+        // o FECHAVA 100 ms depois: o teclado aparecia e sumia. O destaque do
+        // campo focado continua (vem do evento, não do foco real).
+        triggerFocus: false,
       });
       // `startLive()` sem argumento usa `Date.now()` como "baselineTime":
       // eventos com timestamp anterior a isso (o instantâneo inicial e o
@@ -383,6 +390,7 @@ export function LiveSessionViewer({
   }
 
   const lastMoveSentAtRef = useRef(0);
+  const typingInputRef = useRef<HTMLInputElement | null>(null);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     // Throttle: mousemove dispara a cada pixel — sem isso, cada
@@ -403,6 +411,12 @@ export function LiveSessionViewer({
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = getIframeRect();
     if (!rect) return;
+    // No celular (toque), um toque no espelho é para escrever naquele campo: leva
+    // o foco ao campo de digitação ainda dentro do gesto do toque (exigência dos
+    // navegadores para abrir o teclado) e o teclado fica aberto.
+    if (controlGrantedRef.current && window.matchMedia?.("(pointer: coarse)").matches) {
+      typingInputRef.current?.focus({ preventScroll: true });
+    }
     sendControl({
       type: "click",
       xFrac: (e.clientX - rect.left) / rect.width,
@@ -430,25 +444,6 @@ export function LiveSessionViewer({
     return () => el.removeEventListener("wheel", handleWheel);
   }, [status]);
 
-  // O rrweb, ao repetir o evento de foco que ele mesmo gravou no usuário,
-  // foca o iframe de replay por baixo dos panos — um iframe é outro
-  // contexto de navegação, então o teclado dali NUNCA borbulha até o
-  // `window` desta página (e o foco entrando num iframe nem sempre
-  // dispara um evento `focus` capturável no documento pai, então um
-  // listener de evento não é confiável aqui — só um polling curto é).
-  // Sem isso, nenhum keydown chegaria no listener abaixo depois da
-  // primeira vez que algo for focado do lado do usuário.
-  useEffect(() => {
-    if (status !== "active") return;
-
-    const interval = setInterval(() => {
-      if (document.activeElement instanceof HTMLIFrameElement) {
-        document.activeElement.blur();
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [status]);
-
   // Captura o teclado em `window`, não no foco do container — pelo mesmo
   // motivo acima, nunca dá pra depender de um elemento específico ter
   // foco. Só encaminha teclas enquanto o mouse do admin está sobre o
@@ -458,6 +453,8 @@ export function LiveSessionViewer({
 
     function handleWindowKeyDown(e: KeyboardEvent) {
       if (!hoveringRef.current || !controlGrantedRef.current) return;
+      // O campo "Digitar na tela da pessoa" já repassa o que é digitado nele.
+      if (document.activeElement === typingInputRef.current) return;
       if (e.key.length === 1 || e.key === "Backspace" || e.key === "Enter") {
         e.preventDefault();
         sendControl({ type: "key", key: e.key });
@@ -648,6 +645,9 @@ export function LiveSessionViewer({
             />
           </div>
         </div>
+      )}
+      {controlGranted && status === "active" && (
+        <RemoteTypingInput inputRef={typingInputRef} onControl={sendControl} />
       )}
       {controlGranted && (
         <p className="text-muted-foreground text-xs">

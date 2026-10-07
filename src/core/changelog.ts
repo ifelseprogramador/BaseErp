@@ -24,6 +24,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.1",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: 'No celular, ao usar o controle remoto da tela de alguém, o teclado não aparece e some mais. Há um campo "Digitar na tela da pessoa": toque num campo na tela dela, digite ali e o texto vai para o campo (inclusive com correção automática de palavras).',
+      },
+      {
+        type: "correcao",
+        text: "Removido um aviso de erro no console causado por extensões do navegador que alteram a página antes de ela carregar.",
+      },
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-10-07",
     changes: [

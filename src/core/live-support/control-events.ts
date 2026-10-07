@@ -8,4 +8,24 @@ export type ControlEvent =
   | { type: "move"; xFrac: number; yFrac: number }
   | { type: "click"; xFrac: number; yFrac: number }
   | { type: "key"; key: string }
+  /** Texto digitado no campo "Digitar na tela da pessoa" (celular): apaga
+   * `deleteCount` caracteres do fim do campo focado e acrescenta `text`. */
+  | { type: "text"; text: string; deleteCount: number }
   | { type: "scroll"; deltaX: number; deltaY: number };
+
+/**
+ * O que mudou entre o texto anterior e o novo de um campo de digitação: quantos
+ * caracteres do FIM foram apagados e o que foi acrescentado. Funciona para
+ * digitar, apagar, colar e para teclados de celular que reescrevem a palavra
+ * enquanto compõem (ex.: "cafe" → "café"): o campo remoto sempre termina igual
+ * ao local. Compara pelo prefixo comum.
+ */
+export function computeTextDelta(
+  previous: string,
+  next: string,
+): { deleteCount: number; text: string } {
+  let common = 0;
+  const limit = Math.min(previous.length, next.length);
+  while (common < limit && previous[common] === next[common]) common += 1;
+  return { deleteCount: previous.length - common, text: next.slice(common) };
+}

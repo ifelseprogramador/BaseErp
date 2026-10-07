@@ -1004,3 +1004,37 @@ o painel, e garante que quem saiu do painel receba no celular.
 Sem migration nova. Testes novos: serviço de mensagem do dono, caixa de entrada e o
 widget do usuário (abre a conversa quando o suporte responde, aviso de tela, recusar
 sem fechar, aprovar na mesma sessão, aviso "offline" que sai quando a resposta chega).
+
+## 2026-10-07 — Controle remoto pelo celular do dono: teclado que sumia
+
+**Sintoma:** com o controle remoto liberado, o dono no celular tocava num campo da tela
+da pessoa e o teclado aparecia e sumia na hora; não dava para escrever.
+
+**Causa:** duas coisas. (1) Ao repetir o "foco" gravado na pessoa, o rrweb focava o
+iframe do espelho (`triggerFocus`, padrão ligado) — no celular isso ABRE o teclado — e
+um intervalo de 100 ms (feito para o teclado do computador chegar na janela) tirava o
+foco do iframe: o teclado fechava 100 ms depois. (2) Mesmo sem isso, o teclado virtual só
+aparece para um campo REAL e focado, e muitos teclados (Gboard) nem informam a tecla no
+`keydown` (vem `Unidentified`), então o repasse de teclas por `keydown` não servia.
+
+**Correção:**
+
+- Replayer com `triggerFocus: false` (o destaque do campo focado continua — vem do
+  evento `mouse-interaction`, emitido antes da checagem de foco). O intervalo que tirava
+  o foco do iframe saiu.
+- Campo "Digitar na tela da pessoa" (`remote-typing-input.tsx`), visível com o controle
+  liberado. No celular, um toque no espelho leva o foco para ele dentro do gesto do
+  toque (exigência para abrir o teclado). O que muda no campo vira
+  `{ type: "text", text, deleteCount }` (`computeTextDelta`: prefixo comum), então
+  funciona para digitar, apagar, colar e para a correção automática de palavra
+  ("cafe" → "café"). `applyControlEvent` aplica no campo focado da pessoa com o setter
+  nativo (o React enxerga a mudança). Enter envia a tecla Enter e limpa.
+- O `keydown` da janela não repassa tecla enquanto esse campo está focado (evita
+  duplicar).
+
+**Limite conhecido:** rolar a tela da pessoa continua só pela roda do mouse; no toque, o
+gesto de arrastar rola o espelho localmente, não a página dela.
+
+**Aviso de hidratação:** `<body suppressHydrationWarning>` nos três layouts — extensões
+(ColorZilla injeta `cz-shortcut-listen`, gerenciadores de senha, tradutores) mudam o
+`<body>` antes de o React assumir e geravam um erro de console que não é bug do sistema.

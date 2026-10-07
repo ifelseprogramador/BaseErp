@@ -36,9 +36,21 @@ export function applyControlEvent(event: ControlEvent, cursorEl: HTMLElement | n
     applyKey(event.key);
   }
 
+  if (event.type === "text") {
+    applyText(event.text, event.deleteCount);
+  }
+
   if (event.type === "scroll") {
     window.scrollBy(event.deltaX, event.deltaY);
   }
+}
+
+/** Texto vindo do campo de digitação do admin (celular): edita o campo focado. */
+function applyText(text: string, deleteCount: number) {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return;
+  const keep = Math.max(0, el.value.length - Math.max(0, deleteCount));
+  setNativeValue(el, el.value.slice(0, keep) + text);
 }
 
 function applyKey(key: string) {
