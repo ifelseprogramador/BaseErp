@@ -10,7 +10,16 @@ import type { eventWithTime } from "@rrweb/types";
 // um do tamanho da tela gravada (ex.: 720px) — empurrando o conteúdo real
 // para fora da janela visível. Era a causa do "só aparece fundo cinza".
 import "rrweb/dist/style.css";
-import { Maximize2, Monitor, RefreshCw, X, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Maximize2,
+  Monitor,
+  RefreshCw,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +34,8 @@ import {
 } from "../actions";
 import { dispatchChatMessage } from "../chat-events";
 import { SupportChatPanel } from "./support-chat-panel";
-import { RemoteTypingInput } from "./remote-typing-input";
+import { RemoteTypingInput, type RemoteTypingHandle } from "./remote-typing-input";
+import { elementAtFraction, readEditableField } from "../remote-field";
 
 // `target` de um evento "mouse-interaction" do Replayer vem do
 // `contentDocument` do iframe — outro realm de JS, com seu próprio
@@ -43,6 +53,11 @@ function isStyledElement(value: unknown): value is StyledElement {
     typeof (value as { style?: unknown }).style === "object"
   );
 }
+
+/** Quanto o dedo precisa se mover para virar um arrasto (e não um toque). */
+const TOUCH_DRAG_THRESHOLD_PX = 8;
+/** Quanto cada botão de rolar anda a página da pessoa (px dela). */
+const SCROLL_BUTTON_STEP_PX = 300;
 
 function clearHighlight(el: StyledElement) {
   el.style.removeProperty("outline");
@@ -113,6 +128,10 @@ export function LiveSessionViewer({
   useEffect(() => {
     controlGrantedRef.current = controlGranted;
   }, [controlGranted]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   useEffect(() => {
     const channel = getRealtimeChannel(liveSessionChannelName(sessionId));
@@ -390,7 +409,19 @@ export function LiveSessionViewer({
   }
 
   const lastMoveSentAtRef = useRef(0);
-  const typingInputRef = useRef<HTMLInputElement | null>(null);
+  const typingRef = useRef<RemoteTypingHandle | null>(null);
+  // Toque em andamento no espelho (rolagem por arrasto) e trava do clique que o
+  // navegador dispara depois de um arrasto.
+  const touchRef = useRef<{
+    x: number;
+    y: number;
+    moved: boolean;
+    lastSent: number;
+    pendingX: number;
+    pendingY: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+  const zoomRef = useRef(1);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     // Throttle: mousemove dispara a cada pixel — sem isso, cada
@@ -409,19 +440,95 @@ export function LiveSessionViewer({
   }
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    // Um toque logo depois de um ARRASTO (rolagem) não é um clique.
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     const rect = getIframeRect();
     if (!rect) return;
-    // No celular (toque), um toque no espelho é para escrever naquele campo: leva
-    // o foco ao campo de digitação ainda dentro do gesto do toque (exigência dos
-    // navegadores para abrir o teclado) e o teclado fica aberto.
+    const xFrac = (e.clientX - rect.left) / rect.width;
+    const yFrac = (e.clientY - rect.top) / rect.height;
+
+    // O que foi tocado na réplica da tela: só um campo de TEXTO leva o foco ao
+    // campo de digitação (abre o teclado do celular, ainda dentro do gesto do
+    // toque, que é o que os navegadores exigem) e o faz começar com o texto que o
+    // campo já tem — assim dá para apagar o que já está escrito. Em botão, link ou
+    // texto solto o teclado NÃO abre (e fecha, se estava aberto).
     if (controlGrantedRef.current && window.matchMedia?.("(pointer: coarse)").matches) {
-      typingInputRef.current?.focus({ preventScroll: true });
+      const field = readEditableField(elementAtFraction(getIframe(), xFrac, yFrac));
+      if (field) {
+        typingRef.current?.setBase(field.value);
+        typingRef.current?.focus();
+      } else {
+        typingRef.current?.blur();
+      }
     }
-    sendControl({
-      type: "click",
-      xFrac: (e.clientX - rect.left) / rect.width,
-      yFrac: (e.clientY - rect.top) / rect.height,
-    });
+    sendControl({ type: "click", xFrac, yFrac });
+  }
+
+  function getIframe(): HTMLIFrameElement | null {
+    return containerRef.current?.querySelector("iframe") ?? null;
+  }
+
+  // Rolagem por toque: com o controle liberado, arrastar o dedo no espelho rola a
+  // página REAL da pessoa (como a roda do mouse no computador). O movimento do
+  // dedo é em pixels do espelho (que pode estar com zoom), então vira pixels da
+  // página dividindo pelo zoom. Dedo para cima = página para baixo.
+  function flushTouchScroll(state: NonNullable<typeof touchRef.current>, now: number) {
+    if (state.pendingX === 0 && state.pendingY === 0) return;
+    const z = zoomRef.current || 1;
+    sendControl({ type: "scroll", deltaX: state.pendingX / z, deltaY: state.pendingY / z });
+    state.pendingX = 0;
+    state.pendingY = 0;
+    state.lastSent = now;
+  }
+
+  function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (!controlGrantedRef.current || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchRef.current = {
+      x: t.clientX,
+      y: t.clientY,
+      moved: false,
+      lastSent: 0,
+      pendingX: 0,
+      pendingY: 0,
+    };
+  }
+
+  function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    const state = touchRef.current;
+    if (!state || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = state.x - t.clientX;
+    const dy = state.y - t.clientY;
+    // Abaixo de ~8 px ainda é um toque, não um arrasto.
+    if (!state.moved && Math.hypot(dx, dy) < TOUCH_DRAG_THRESHOLD_PX) return;
+    state.moved = true;
+    state.x = t.clientX;
+    state.y = t.clientY;
+    state.pendingX += dx;
+    state.pendingY += dy;
+    const now = Date.now();
+    if (now - state.lastSent >= 40) flushTouchScroll(state, now);
+  }
+
+  function handleTouchEnd() {
+    const state = touchRef.current;
+    touchRef.current = null;
+    if (!state?.moved) return;
+    flushTouchScroll(state, Date.now());
+    // O navegador ainda dispara um "click" depois do arrasto: ignora-o, e solta a
+    // trava logo depois para ela nunca engolir um toque verdadeiro.
+    suppressClickRef.current = true;
+    setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 400);
+  }
+
+  function scrollRemote(deltaY: number) {
+    sendControl({ type: "scroll", deltaX: 0, deltaY });
   }
 
   // A rolagem do mouse sobre o espelho, com controle concedido, rola a
@@ -454,7 +561,7 @@ export function LiveSessionViewer({
     function handleWindowKeyDown(e: KeyboardEvent) {
       if (!hoveringRef.current || !controlGrantedRef.current) return;
       // O campo "Digitar na tela da pessoa" já repassa o que é digitado nele.
-      if (document.activeElement === typingInputRef.current) return;
+      if (typingRef.current?.isFocused()) return;
       if (e.key.length === 1 || e.key === "Backspace" || e.key === "Enter") {
         e.preventDefault();
         sendControl({ type: "key", key: e.key });
@@ -556,6 +663,28 @@ export function LiveSessionViewer({
               </Button>
             </div>
           )}
+          {status === "active" && controlGranted && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Rolar a tela da pessoa para cima"
+                aria-label="Rolar a tela da pessoa para cima"
+                onClick={() => scrollRemote(-SCROLL_BUTTON_STEP_PX)}
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Rolar a tela da pessoa para baixo"
+                aria-label="Rolar a tela da pessoa para baixo"
+                onClick={() => scrollRemote(SCROLL_BUTTON_STEP_PX)}
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           {status === "active" && (
             <Button
               variant="outline"
@@ -619,6 +748,13 @@ export function LiveSessionViewer({
             hoveringRef.current = false;
           }}
           onClick={handleClick}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          // Com o controle liberado, o arrasto do dedo rola a página DELA (não o
+          // espelho): o navegador não pode tomar o gesto para si.
+          style={controlGranted ? { touchAction: "none" } : undefined}
           className="bg-muted relative h-[75vh] w-full overflow-auto rounded-lg border [&_iframe]:pointer-events-none"
         >
           {!hasFrame && !connectionError && (
@@ -657,7 +793,7 @@ export function LiveSessionViewer({
         </div>
       )}
       {controlGranted && status === "active" && (
-        <RemoteTypingInput inputRef={typingInputRef} onControl={sendControl} />
+        <RemoteTypingInput handleRef={typingRef} onControl={sendControl} />
       )}
       {controlGranted && (
         <p className="text-muted-foreground text-xs">

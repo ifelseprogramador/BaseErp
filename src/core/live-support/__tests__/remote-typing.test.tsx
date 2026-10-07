@@ -1,9 +1,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { createRef } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyControlEvent } from "@/core/live-support/apply-control-event";
 import { computeTextDelta, type ControlEvent } from "@/core/live-support/control-events";
-import { RemoteTypingInput } from "@/core/live-support/components/remote-typing-input";
+import {
+  RemoteTypingInput,
+  type RemoteTypingHandle,
+} from "@/core/live-support/components/remote-typing-input";
 
 afterEach(cleanup);
 
@@ -153,5 +157,80 @@ describe("RemoteTypingInput", () => {
     await user.keyboard("c");
 
     expect(sent.at(-1)).toEqual({ type: "text", text: "c", deleteCount: 0 });
+  });
+});
+
+describe("RemoteTypingInput — campo remoto que já tem texto", () => {
+  function setupWithHandle() {
+    const sent: ControlEvent[] = [];
+    const handle = createRef<RemoteTypingHandle>();
+    render(<RemoteTypingInput handleRef={handle} onControl={(event) => sent.push(event)} />);
+    return {
+      sent,
+      handle,
+      input: screen.getByLabelText("Digitar na tela da pessoa") as HTMLInputElement,
+    };
+  }
+
+  it("setBase faz o campo começar com o texto do campo remoto, sem enviar nada", () => {
+    const { sent, handle, input } = setupWithHandle();
+
+    handle.current?.setBase("Maria Silva");
+
+    expect(input.value).toBe("Maria Silva");
+    expect(sent).toHaveLength(0);
+  });
+
+  it("depois do texto base, apagar o último caractere apaga o último caractere do campo remoto", () => {
+    const { sent, handle, input } = setupWithHandle();
+    handle.current?.setBase("Maria");
+
+    fireEvent.input(input, { target: { value: "Mari" } });
+
+    expect(sent).toEqual([{ type: "text", text: "", deleteCount: 1 }]);
+  });
+
+  it("depois do texto base, digitar continua do fim do texto que já estava", () => {
+    const { sent, handle, input } = setupWithHandle();
+    handle.current?.setBase("Rua A");
+
+    fireEvent.input(input, { target: { value: "Rua A," } });
+
+    expect(sent).toEqual([{ type: "text", text: ",", deleteCount: 0 }]);
+  });
+
+  it("apagar tudo de uma vez e escrever outra coisa substitui o texto remoto", () => {
+    const { sent, handle, input } = setupWithHandle();
+    handle.current?.setBase("antigo");
+
+    fireEvent.input(input, { target: { value: "" } });
+    fireEvent.input(input, { target: { value: "novo" } });
+
+    expect(sent).toEqual([
+      { type: "text", text: "", deleteCount: 6 },
+      { type: "text", text: "novo", deleteCount: 0 },
+    ]);
+  });
+
+  it("'Limpar campo' apaga tudo no campo remoto e esvazia o campo local", async () => {
+    const user = userEvent.setup();
+    const { sent, handle, input } = setupWithHandle();
+    handle.current?.setBase("muito texto");
+
+    await user.click(screen.getByRole("button", { name: /Limpar campo/ }));
+
+    expect(sent).toEqual([{ type: "text", text: "", deleteCount: 100_000 }]);
+    expect(input.value).toBe("");
+  });
+
+  it("focus e blur do handle abrem e fecham o campo (o teclado do celular)", () => {
+    const { handle, input } = setupWithHandle();
+
+    handle.current?.focus();
+    expect(document.activeElement).toBe(input);
+    expect(handle.current?.isFocused()).toBe(true);
+
+    handle.current?.blur();
+    expect(handle.current?.isFocused()).toBe(false);
   });
 });

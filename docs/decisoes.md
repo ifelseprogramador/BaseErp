@@ -1055,3 +1055,29 @@ trunca e o grupo de ícones é `shrink-0`. Testes de classe garantem a regra
 (`live-session-viewer.test.tsx`, `live-support-widget.test.tsx`,
 `support-chat-panel.test.tsx`) — é uma checagem de estrutura, não de pixels: a prova
 final é abrir no celular.
+
+## 2026-10-07 — Controle remoto pelo celular: teclado só em campo, texto existente e rolagem
+
+Três defeitos do teste real no celular, todos no viewer do dono:
+
+1. **Teclado abria em qualquer toque.** `handleClick` levava o foco ao campo de digitação a
+   cada toque. Agora `remote-field.ts` descobre o que há no ponto tocado DENTRO do iframe do
+   espelho (`elementAtFraction` converte a fração do toque em pixels da tela gravada,
+   independente do zoom) e `readEditableField` decide: só `<input>` de tipo texto
+   (text/search/email/url/tel/password/number), `<textarea>` e contenteditable abrem o teclado;
+   checkbox, radio, botão, arquivo, cor, data, leitura-apenas e desativado não; tocar em
+   qualquer outra coisa ainda FECHA o teclado. Os elementos do iframe são de outro documento
+   (`instanceof` falha entre documentos), então tudo é checado por `tagName`/propriedades.
+2. **Não dava para apagar o texto que o campo já tinha.** O campo de digitação começava
+   vazio e o delta era relativo a ele (Backspace num campo vazio não gera evento). Agora o
+   toque faz o campo COMEÇAR com o valor do campo remoto (`RemoteTypingHandle.setBase`), então
+   apagar/colar/digitar é relativo ao texto real. Botão "Limpar campo" apaga tudo.
+3. **Rolar a tela da pessoa pelo celular.** Só a roda do mouse rolava a página dela. Com o
+   controle liberado, arrastar o dedo no espelho manda `scroll` (movimento ÷ zoom, porque o
+   espelho pode estar reduzido; dedo para cima = página para baixo; envio a cada 40 ms);
+   abaixo de 8 px é toque, e o clique que o navegador dispara depois de um arrasto é ignorado
+   (a trava solta em 400 ms para nunca engolir um toque verdadeiro). `touch-action: none` só
+   com o controle liberado — sem ele o espelho continua rolando localmente. Botões ↑/↓ rolam
+   300 px da página dela (também no computador).
+
+Limite: o texto é editado no FIM do campo (não há cursor remoto no meio da frase).

@@ -24,6 +24,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.10.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: "No celular, dá para rolar a tela da pessoa arrastando o dedo sobre o espelho (como a roda do mouse no computador), e há botões de rolar para cima e para baixo.",
+      },
+      {
+        type: "correcao",
+        text: "No controle remoto pelo celular, o teclado só abre quando você toca num campo de texto — antes abria até ao tocar em botões e textos.",
+      },
+      {
+        type: "correcao",
+        text: 'Ao tocar num campo que já tem texto, o campo de digitação começa com esse texto: dá para apagar o que já estava escrito, e há o botão "Limpar campo".',
+      },
+    ],
+  },
+  {
     version: "0.9.2",
     date: "2026-10-07",
     changes: [
