@@ -377,6 +377,18 @@ describe("LiveSessionViewer — celular com controle remoto liberado", () => {
       expect(ev.defaultPrevented).toBe(true);
     });
 
+    it("botões da conversa mandam recolher e mover a caixa dela", () => {
+      renderActive();
+
+      fireEvent.click(screen.getByRole("button", { name: /Recolher\/expandir/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Mover a conversa dela para esquerda" }));
+
+      expect(controlsSent()).toEqual([
+        { type: "panel", action: "toggle" },
+        { type: "panel", action: "left" },
+      ]);
+    });
+
     it("os botões de rolar andam a página da pessoa para cima e para baixo", () => {
       renderActive();
 

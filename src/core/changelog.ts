@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.10.3",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "No controle remoto, o dono agora recolhe/expande a caixa de conversa que aparece na tela da pessoa e a move para os lados, com botões próprios (o alvo é pequeno e o arrasto não passa pelo espelho).",
+      },
+    ],
+  },
+  {
     version: "0.10.2",
     date: "2026-10-07",
     changes: [

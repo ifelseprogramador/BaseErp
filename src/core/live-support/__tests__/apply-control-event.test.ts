@@ -52,4 +52,24 @@ describe("applyControlEvent", () => {
 
     expect(select.selectedIndex).toBe(0);
   });
+
+  it("panel/toggle clica no botão de recolher da conversa", () => {
+    document.body.innerHTML = '<button aria-label="Recolher conversa"></button>';
+    const onClick = vi.fn();
+    document.querySelector("button")!.addEventListener("click", onClick);
+
+    applyControlEvent({ type: "panel", action: "toggle" }, null);
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("panel/direção empurra a barra da conversa com as setas", () => {
+    document.body.innerHTML = '<div role="group" aria-label="Barra da conversa. Arraste."></div>';
+    const keys: string[] = [];
+    document.querySelector("div")!.addEventListener("keydown", (e) => keys.push(e.key));
+
+    applyControlEvent({ type: "panel", action: "left" }, null);
+
+    expect(keys).toEqual(["ArrowLeft", "ArrowLeft", "ArrowLeft"]);
+  });
 });

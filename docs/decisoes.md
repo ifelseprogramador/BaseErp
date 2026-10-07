@@ -1104,3 +1104,12 @@ pessoa (`selectedIndex` + `input`/`change`). (2) Menus em JS (Base UI): abrem no
 `mousedown`, e o controle remoto só chamava `el.click()`; agora o clique remoto percorre
 pointerdown → mousedown → pointerup → mouseup → click. Limite: quando é a PESSOA quem abre um
 `<select>` nativo, o dono continua sem ver a lista aberta (só vê o valor depois que ela escolhe).
+
+## 2026-10-07 — Conversa na tela da pessoa: recolher e mover pelo controle remoto
+
+O dono não conseguia recolher/expandir nem mover a caixa de conversa que aparece na tela da
+pessoa: o botão de recolher é minúsculo no espelho reduzido (no celular) e o arrasto da barra
+(pointer events) não passa pelo clique remoto. Novo evento `panel {action}`: `toggle` clica no
+botão de recolher/expandir; `left/right/up/down` mandam 3 passos de seta (16 px cada) à barra da
+conversa, reaproveitando o movimento por teclado do `DraggablePanel`. O viewer ganhou os botões
+"Recolher/expandir" e as quatro setas ao lado dos de rolar.

@@ -15,7 +15,10 @@ export type ControlEvent =
   /** Texto digitado no campo "Digitar na tela da pessoa" (celular): apaga
    * `deleteCount` caracteres do fim do campo focado e acrescenta `text`. */
   | { type: "text"; text: string; deleteCount: number }
-  | { type: "scroll"; deltaX: number; deltaY: number };
+  | { type: "scroll"; deltaX: number; deltaY: number }
+  /** Caixa de conversa na tela da pessoa: recolher/expandir ou empurrar para um lado
+   * (o alvo é pequeno e o arrasto não passa pelo espelho). */
+  | { type: "panel"; action: "toggle" | "left" | "right" | "up" | "down" };
 
 /**
  * O que mudou entre o texto anterior e o novo de um campo de digitação: quantos

@@ -52,6 +52,10 @@ export function applyControlEvent(event: ControlEvent, cursorEl: HTMLElement | n
     applyText(event.text, event.deleteCount);
   }
 
+  if (event.type === "panel") {
+    applyPanel(event.action);
+  }
+
   if (event.type === "scroll") {
     window.scrollBy(event.deltaX, event.deltaY);
   }
@@ -76,6 +80,29 @@ function pressSequence(el: HTMLElement, x: number, y: number) {
     );
   }
   el.dispatchEvent(new MouseEvent("mouseup", base));
+}
+
+const PANEL_KEYS = { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown" };
+const PANEL_NUDGES = 3; // 3 passos de teclado (16 px cada) por toque
+
+/** Recolhe/expande a caixa de conversa da pessoa, ou a empurra para um lado. */
+function applyPanel(action: "toggle" | "left" | "right" | "up" | "down") {
+  if (action === "toggle") {
+    document
+      .querySelector<HTMLElement>(
+        '[aria-label="Recolher conversa"], [aria-label="Expandir conversa"]',
+      )
+      ?.click();
+    return;
+  }
+  const bar = document.querySelector<HTMLElement>(
+    '[role="group"][aria-label^="Barra da conversa"]',
+  );
+  for (let i = 0; i < PANEL_NUDGES; i += 1) {
+    bar?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: PANEL_KEYS[action], bubbles: true, cancelable: true }),
+    );
+  }
 }
 
 /** Texto vindo do campo de digitação do admin (celular): edita o campo focado. */

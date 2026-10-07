@@ -12,7 +12,10 @@ import type { eventWithTime } from "@rrweb/types";
 import "rrweb/dist/style.css";
 import {
   ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
+  MessageSquare,
   Maximize2,
   Monitor,
   RefreshCw,
@@ -710,6 +713,41 @@ export function LiveSessionViewer({
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
+            </div>
+          )}
+          {status === "active" && controlGranted && (
+            <div
+              className="flex items-center gap-1"
+              role="group"
+              aria-label="Conversa na tela da pessoa"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                title="Recolher ou expandir a caixa de conversa na tela da pessoa"
+                onClick={() => sendControl({ type: "panel", action: "toggle" })}
+              >
+                <MessageSquare className="h-4 w-4" /> Recolher/expandir
+              </Button>
+              {(
+                [
+                  ["left", ArrowLeft, "esquerda"],
+                  ["up", ArrowUp, "cima"],
+                  ["down", ArrowDown, "baixo"],
+                  ["right", ArrowRight, "direita"],
+                ] as const
+              ).map(([action, Icon, label]) => (
+                <Button
+                  key={action}
+                  variant="outline"
+                  size="icon-sm"
+                  title={`Mover a conversa dela para ${label}`}
+                  aria-label={`Mover a conversa dela para ${label}`}
+                  onClick={() => sendControl({ type: "panel", action })}
+                >
+                  <Icon className="h-4 w-4" />
+                </Button>
+              ))}
             </div>
           )}
           {status === "active" && controlGranted && (
