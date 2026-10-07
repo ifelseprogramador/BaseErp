@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { isTelegramConfigured, sendTelegramMessage } = await import("@/core/telegram");
+const { isTelegramConfigured, sendTelegramMessage, sendTelegramMessageDetailed } =
+  await import("@/core/telegram");
 
 const original = { token: process.env.TELEGRAM_BOT_TOKEN, chat: process.env.TELEGRAM_CHAT_ID };
 
@@ -57,5 +58,34 @@ describe("telegram", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("rede caiu")));
 
     await expect(sendTelegramMessage("x")).resolves.toBe(false);
+  });
+
+  it("detalhado: explica o motivo quando o Telegram recusa (sem expor o token)", async () => {
+    process.env.TELEGRAM_BOT_TOKEN = "123:ABC";
+    process.env.TELEGRAM_CHAT_ID = "999";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ ok: false, description: "Bad Request: chat not found" }),
+      }),
+    );
+
+    const result = await sendTelegramMessageDetailed("x");
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "rejected",
+      detail: "Bad Request: chat not found",
+    });
+    expect(JSON.stringify(result)).not.toContain("123:ABC");
+  });
+
+  it("detalhado: sem configuração, diz que não está configurado", async () => {
+    await expect(sendTelegramMessageDetailed("x")).resolves.toEqual({
+      ok: false,
+      reason: "not_configured",
+    });
   });
 });

@@ -15,12 +15,20 @@ export function isTelegramConfigured(): boolean {
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
 }
 
-export async function sendTelegramMessage(text: string): Promise<boolean> {
+export type TelegramSendResult =
+  { ok: true } | { ok: false; reason: "not_configured" | "rejected" | "network"; detail?: string };
+
+/**
+ * Envia e explica o motivo quando falha — usado pelo botão "Enviar mensagem de
+ * teste" do `/admin`. `detail` é a descrição devolvida pelo Telegram (ex.:
+ * "Unauthorized", "Bad Request: chat not found"), que nunca contém o token.
+ */
+export async function sendTelegramMessageDetailed(text: string): Promise<TelegramSendResult> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) {
     logger.warn("telegram.nao_configurado");
-    return false;
+    return { ok: false, reason: "not_configured" };
   }
 
   try {
@@ -31,15 +39,20 @@ export async function sendTelegramMessage(text: string): Promise<boolean> {
       signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) {
-      // Nunca loga o corpo da URL (tem o token) — só o status.
-      logger.error("telegram.envio_falhou", { status: response.status });
-      return false;
+      const body = (await response.json().catch(() => null)) as { description?: string } | null;
+      // Nunca loga a URL (tem o token) — só o status e a descrição do Telegram.
+      logger.error("telegram.envio_falhou", { status: response.status, detail: body?.description });
+      return { ok: false, reason: "rejected", detail: body?.description };
     }
-    return true;
+    return { ok: true };
   } catch (err) {
     logger.error("telegram.envio_falhou", {
       reason: err instanceof Error ? err.name : "desconhecido",
     });
-    return false;
+    return { ok: false, reason: "network" };
   }
+}
+
+export async function sendTelegramMessage(text: string): Promise<boolean> {
+  return (await sendTelegramMessageDetailed(text)).ok;
 }

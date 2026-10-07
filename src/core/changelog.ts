@@ -24,6 +24,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.3",
+    date: "2026-10-06",
+    changes: [
+      {
+        type: "novo",
+        text: "A caixa de conversa do suporte agora pode ser redimensionada: puxe o canto superior esquerdo ou o inferior direito (ou use as setas do teclado com o canto selecionado).",
+      },
+      {
+        type: "novo",
+        text: 'Em Administração, o botão "Enviar mensagem de teste" confirma se o aviso por Telegram está funcionando e explica o que falta quando não está.',
+      },
+    ],
+  },
+  {
     version: "0.7.2",
     date: "2026-10-06",
     changes: [

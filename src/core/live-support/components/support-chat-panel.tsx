@@ -65,6 +65,7 @@ export function SupportChatPanel({
 
   return (
     <DraggablePanel
+      collapsed={!open}
       className={
         className ??
         "bg-card fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border p-3 shadow-lg"

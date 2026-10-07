@@ -114,10 +114,10 @@ export function SupportChat({
   const otherLabel = side === "user" ? "Suporte" : "Cliente";
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    <div className={cn("flex min-h-0 flex-1 flex-col gap-2", className)}>
       <div
         ref={listRef}
-        className="bg-muted/40 flex h-48 flex-col gap-1.5 overflow-y-auto rounded-md border p-2 text-sm"
+        className="bg-muted/40 flex min-h-24 flex-1 basis-48 flex-col gap-1.5 overflow-y-auto rounded-md border p-2 text-sm"
       >
         {messages.length === 0 ? (
           <p className="text-muted-foreground m-auto flex items-center gap-1.5 text-xs">

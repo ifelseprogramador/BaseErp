@@ -17,7 +17,7 @@ import {
 import { recordAudit } from "@/core/admin/audit";
 import { expireStalePendingSessions } from "./queries";
 import { sendBroadcast as broadcast } from "@/core/supabase/realtime-sender";
-import { sendTelegramMessage } from "@/core/telegram";
+import { sendTelegramMessage, sendTelegramMessageDetailed } from "@/core/telegram";
 import type { ActionResult } from "@/core/action-result";
 import {
   adminSupportInboxChannelName,
@@ -851,4 +851,26 @@ export async function updateSupportWaitSeconds(seconds: number): Promise<ActionR
   log.info("admin.suporte.espera", { seconds: value });
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/**
+ * Botão "Enviar mensagem de teste" do `/admin`: confirma que o token e o chat
+ * id das variáveis de ambiente funcionam, e diz o que está errado quando não.
+ */
+export async function sendTelegramTest(): Promise<ActionResult> {
+  const { log } = await requireAdmin();
+  const result = await sendTelegramMessageDetailed(
+    "✅ Teste do suporte: este chat vai receber o aviso quando alguém pedir ajuda e você não estiver online.",
+  );
+  if (result.ok) {
+    log.info("admin.telegram.teste_ok");
+    return { ok: true };
+  }
+  const messages = {
+    not_configured:
+      "Faltam TELEGRAM_BOT_TOKEN e/ou TELEGRAM_CHAT_ID nas variáveis de ambiente (e reinicie o servidor depois de editar o .env.local).",
+    rejected: `O Telegram recusou${result.detail ? `: ${result.detail}` : ""}. Confira o token e o chat id — e lembre de mandar uma mensagem para o bot antes (ele só fala com quem já falou com ele).`,
+    network: "Não foi possível falar com o Telegram agora. Tente de novo em instantes.",
+  } as const;
+  return { ok: false, message: messages[result.reason] };
 }

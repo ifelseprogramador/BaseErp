@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -115,5 +115,47 @@ describe("SupportChatPanel — aviso de mensagem nova", () => {
 
     await user.click(within(header).getByRole("button", { name: "Ativar aviso sonoro" }));
     expect(window.localStorage.getItem("support-chat-sound")).toBe("on");
+  });
+});
+
+describe("SupportChatPanel — tamanho ajustável", () => {
+  function panelRoot() {
+    return screen.getByRole("group").parentElement as HTMLElement;
+  }
+
+  it("tem alças nos cantos superior-esquerdo e inferior-direito", () => {
+    render(<SupportChatPanel sessionId={SESSION} side="user" />);
+
+    expect(panelRoot().querySelector('[data-resize-handle="tl"]')).toBeTruthy();
+    expect(panelRoot().querySelector('[data-resize-handle="br"]')).toBeTruthy();
+  });
+
+  it("pelo teclado, a alça aumenta a caixa e respeita o tamanho mínimo", () => {
+    render(<SupportChatPanel sessionId={SESSION} side="user" />);
+    const handle = panelRoot().querySelector('[data-resize-handle="br"]') as HTMLElement;
+
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(panelRoot().style.width).toBe("240px"); // mínimo (jsdom mede 0)
+    expect(panelRoot().style.height).toBe("220px");
+
+    // Encolher abaixo do mínimo não passa de 240 x 220.
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+    expect(panelRoot().style.width).toBe("240px");
+    expect(panelRoot().style.height).toBe("220px");
+  });
+
+  it("recolhida, some com as alças e solta a altura escolhida", async () => {
+    const user = userEvent.setup();
+    render(<SupportChatPanel sessionId={SESSION} side="user" />);
+    fireEvent.keyDown(panelRoot().querySelector('[data-resize-handle="br"]') as HTMLElement, {
+      key: "ArrowRight",
+    });
+    expect(panelRoot().style.height).toBe("220px");
+
+    await user.click(screen.getByRole("button", { name: "Recolher conversa" }));
+
+    expect(panelRoot().querySelector("[data-resize-handle]")).toBeNull();
+    expect(panelRoot().style.height).toBe("");
   });
 });

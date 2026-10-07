@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { updateSupportWaitSeconds } from "@/core/live-support/actions";
+import { sendTelegramTest, updateSupportWaitSeconds } from "@/core/live-support/actions";
 import { MAX_SUPPORT_WAIT_SECONDS, MIN_SUPPORT_WAIT_SECONDS } from "@/core/live-support/wait";
 
 /** Quanto o usuário espera por atendimento antes de o pedido virar "sem
@@ -20,6 +20,15 @@ export function SupportSettingsCard({
 }) {
   const [seconds, setSeconds] = useState(String(initialSeconds));
   const [isPending, startTransition] = useTransition();
+  const [isTesting, startTesting] = useTransition();
+
+  function handleTelegramTest() {
+    startTesting(async () => {
+      const result = await sendTelegramTest();
+      if (result.ok) toast.success("Mensagem de teste enviada. Confira o Telegram.");
+      else toast.error(result.message ?? "Não foi possível enviar o teste.");
+    });
+  }
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -69,6 +78,17 @@ export function SupportSettingsCard({
           um atendimento. Sem ninguém online (ou passado o tempo), o pedido fica aqui e você é
           avisado pelo Telegram.
         </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleTelegramTest}
+            disabled={isTesting || !telegramConfigured}
+          >
+            {isTesting ? "Enviando..." : "Enviar mensagem de teste"}
+          </Button>
+        </div>
         <p className={telegramConfigured ? "text-xs text-emerald-600" : "text-destructive text-xs"}>
           {telegramConfigured
             ? "Telegram configurado."

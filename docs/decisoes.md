@@ -900,3 +900,16 @@ tempo real (`chat-events.ts`) — por isso avisa mesmo recolhida; a lista/campo
   (servidor sempre "ligado") para não divergir do HTML do servidor.
 - O admin passou a ver a conversa flutuante (antes ficava fixa abaixo do
   espelho, rolando para fora da tela).
+
+## 2026-10-06 — Caixa de conversa redimensionável e teste do Telegram
+
+- `DraggablePanel` ganhou alças nos cantos superior-esquerdo e inferior-direito
+  (pointer events e setas do teclado). Ao mexer, passa de âncora CSS (`right/bottom`)
+  para `left/top/width/height`, com mínimo de 240×220 e sempre dentro da janela.
+  Recolhida, ignora a altura escolhida e some com as alças. A lista de mensagens
+  usa `flex-1 basis-48`: altura própria quando a caixa é automática, preenche o
+  espaço quando a caixa tem altura definida.
+- `sendTelegramMessageDetailed` devolve o motivo (não configurado, recusado — com a
+  descrição do Telegram, que nunca traz o token —, rede). Alimenta o botão "Enviar
+  mensagem de teste" do `/admin`, para validar o token e o chat id sem esperar um
+  pedido de suporte de verdade.
