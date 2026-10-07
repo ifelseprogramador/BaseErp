@@ -9,3 +9,5 @@
 Mantenha estes dois arquivos atualizados a cada mudança relevante de
 código — não deixe a documentação para o fim (ver a regra de manutenção
 em `decisoes.md`, 2026-09-24).
+
+- [Checklist de deploy](deploy.md) — passos e verificações para subir para produção.
