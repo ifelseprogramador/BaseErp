@@ -1151,3 +1151,14 @@ sem esses cabeçalhos aparece "Rede local"/"Não identificada" — não há cons
 de geolocalização (enviaria o IP de cada pessoa a terceiros). IP e localização são dados pessoais
 (LGPD): citar na política de privacidade e apagar periodicamente. Só registra login por
 e-mail/senha; sessão renovada automaticamente não gera nova linha.
+
+## 2026-10-07 — Aviso de alterações: detecção por conteúdo, não por evento
+
+A primeira versão do `UnsavedChangesGuard` marcava o formulário como "sujo" ao ouvir `input`/
+`change`. O Select e o Switch do Base UI trocam o valor sem disparar nenhum desses eventos, então
+mexer só neles (ex.: status da cobrança) não avisava. Agora guardamos o conteúdo do formulário
+(`FormData`) quando ele aparece (varredura + `MutationObserver`) ou antes da primeira interação
+(`focusin`/`pointerdown`/`keydown`), e comparamos na hora de sair: voltar ao valor original deixa de
+contar como alteração. Campo sem `name` não entra no `FormData`; para ele o evento `input` ainda
+marca como alterado. Verificado num Chromium real (Playwright) com o formulário de cobrança:
+texto, Select e digitação pelo controle remoto abrem a pergunta, e o espelho (rrweb) a reproduz.

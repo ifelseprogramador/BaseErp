@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.13.1",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "O aviso de alterações não salvas agora também percebe mudanças em listas de opções e interruptores (antes só percebia campos de texto), inclusive quando o dono edita pelo controle remoto.",
+      },
+    ],
+  },
+  {
     version: "0.13.0",
     date: "2026-10-07",
     changes: [

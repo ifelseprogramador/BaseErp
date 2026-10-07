@@ -26,15 +26,42 @@ import {
  */
 
 const GUARDED_FORM = "form[data-unsaved-guard]";
+/** Valor-baseline que nunca é igual a um instantâneo: "já veio alterado". */
+const ALWAYS_DIRTY = "\u0000alterado";
 
-const dirtyForms = new Set<HTMLFormElement>();
+/**
+ * "Sujo" = o conteúdo do formulário agora é diferente do que era quando a pessoa
+ * começou a mexer. Comparamos o conteúdo (FormData) em vez de ouvir só `input`/
+ * `change`, porque componentes como o Select e o Switch do Base UI trocam o valor
+ * sem disparar nenhum evento nativo de formulário.
+ */
+const baselines = new Map<HTMLFormElement, string>();
 let askBeforeLeaving: ((go: () => void) => void) | null = null;
 
-function hasDirtyForm() {
-  for (const form of dirtyForms) {
-    if (!form.isConnected) dirtyForms.delete(form);
+function snapshot(form: HTMLFormElement): string {
+  const entries: [string, string][] = [];
+  new FormData(form).forEach((value, key) => {
+    entries.push([key, typeof value === "string" ? value : value.name]);
+  });
+  return JSON.stringify(entries);
+}
+
+function rememberBaseline(form: HTMLFormElement | null, alreadyChanged = false) {
+  if (form && !baselines.has(form))
+    baselines.set(form, alreadyChanged ? ALWAYS_DIRTY : snapshot(form));
+}
+
+function dirtyFormList(): HTMLFormElement[] {
+  const list: HTMLFormElement[] = [];
+  for (const [form, baseline] of baselines) {
+    if (!form.isConnected) baselines.delete(form);
+    else if (snapshot(form) !== baseline) list.push(form);
   }
-  return dirtyForms.size > 0;
+  return list;
+}
+
+function hasDirtyForm() {
+  return dirtyFormList().length > 0;
 }
 
 /**
@@ -64,14 +91,41 @@ export function UnsavedChangesGuard() {
   }, [router]);
 
   useEffect(() => {
-    function markDirty(event: Event) {
+    // Antes de a pessoa mexer (foco, toque, tecla) guardamos o conteúdo original.
+    function beforeEdit(event: Event) {
+      rememberBaseline(formOf(event.target));
+    }
+    // Se só vimos a mudança (sem ter visto o antes), já conta como alterado.
+    function afterEdit(event: Event) {
       const form = formOf(event.target);
-      if (form) dirtyForms.add(form);
+      rememberBaseline(form, true);
+      // Campo SEM `name` não entra no FormData: o evento é o único sinal que temos.
+      const field = event.target;
+      if (form && field instanceof Element && !field.getAttribute("name")) {
+        baselines.set(form, ALWAYS_DIRTY);
+      }
     }
     function markClean(event: Event) {
       const form = formOf(event.target);
-      if (form) dirtyForms.delete(form);
+      if (form) baselines.delete(form);
     }
+    function scan(root: ParentNode) {
+      root
+        .querySelectorAll<HTMLFormElement>(GUARDED_FORM)
+        .forEach((form) => rememberBaseline(form));
+    }
+    scan(document);
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        record.addedNodes.forEach((node) => {
+          if (node instanceof Element) {
+            if (node.matches(GUARDED_FORM)) rememberBaseline(node as HTMLFormElement);
+            scan(node);
+          }
+        });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
     function onBeforeUnload(event: BeforeUnloadEvent) {
       if (!hasDirtyForm()) return;
       event.preventDefault();
@@ -94,16 +148,23 @@ export function UnsavedChangesGuard() {
     }
 
     askBeforeLeaving = (go) => setPendingGo(() => go);
-    document.addEventListener("input", markDirty, true);
-    document.addEventListener("change", markDirty, true);
+    for (const type of ["focusin", "pointerdown", "keydown"]) {
+      document.addEventListener(type, beforeEdit, true);
+    }
+    document.addEventListener("input", afterEdit, true);
+    document.addEventListener("change", afterEdit, true);
     document.addEventListener("submit", markClean, true);
     document.addEventListener("reset", markClean, true);
     document.addEventListener("click", onClick, true);
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       askBeforeLeaving = null;
-      document.removeEventListener("input", markDirty, true);
-      document.removeEventListener("change", markDirty, true);
+      observer.disconnect();
+      for (const type of ["focusin", "pointerdown", "keydown"]) {
+        document.removeEventListener(type, beforeEdit, true);
+      }
+      document.removeEventListener("input", afterEdit, true);
+      document.removeEventListener("change", afterEdit, true);
       document.removeEventListener("submit", markClean, true);
       document.removeEventListener("reset", markClean, true);
       document.removeEventListener("click", onClick, true);
@@ -113,14 +174,14 @@ export function UnsavedChangesGuard() {
 
   function discardAndLeave() {
     const go = pendingGo;
-    dirtyForms.clear();
+    baselines.clear();
     setPendingGo(null);
     go?.();
   }
 
   function saveHere() {
     setPendingGo(null);
-    for (const form of [...dirtyForms]) form.requestSubmit();
+    for (const form of dirtyFormList()) form.requestSubmit();
   }
 
   return (

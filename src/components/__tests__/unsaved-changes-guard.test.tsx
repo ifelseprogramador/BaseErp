@@ -14,7 +14,7 @@ function setup(guarded = true) {
       <a href="/zzz-teste">Clientes</a>
       <a href="https://outro.com/x">Fora</a>
       <form data-unsaved-guard={guarded ? "" : undefined} onSubmit={(e) => submit(e.nativeEvent)}>
-        <input aria-label="nome" />
+        <input aria-label="nome" name="nome" />
         <button type="submit">Gravar</button>
       </form>
     </>,
@@ -44,6 +44,38 @@ describe("UnsavedChangesGuard", () => {
     expect(notPrevented).toBe(false);
     expect(screen.getByText("Alterações não salvas")).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("valor trocado por código, sem nenhum evento (Select/Switch do Base UI), também conta", () => {
+    const { input } = setup();
+    fireEvent.focusIn(input);
+    (input as HTMLInputElement).value = "trocado sem evento";
+
+    expect(fireEvent.click(screen.getByText("Clientes"))).toBe(false);
+    expect(screen.getByText("Alterações não salvas")).toBeTruthy();
+  });
+
+  it("campo sem name (fora do FormData) continua sendo detectado pelo evento", () => {
+    render(
+      <>
+        <UnsavedChangesGuard />
+        <a href="/zzz-teste">Ir</a>
+        <form data-unsaved-guard="">
+          <input aria-label="sem nome" />
+        </form>
+      </>,
+    );
+    fireEvent.input(screen.getByLabelText("sem nome"), { target: { value: "x" } });
+    expect(fireEvent.click(screen.getByText("Ir"))).toBe(false);
+  });
+
+  it("voltar ao valor original deixa de contar como alteração", () => {
+    const { input } = setup();
+    fireEvent.focusIn(input);
+    fireEvent.input(input, { target: { value: "x" } });
+    fireEvent.input(input, { target: { value: "" } });
+
+    expect(fireEvent.click(screen.getByText("Clientes"))).toBe(true);
   });
 
   it("'Descartar e sair' navega para onde a pessoa queria ir", () => {
