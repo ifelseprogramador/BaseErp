@@ -21,6 +21,9 @@ import { listNotificationsForCurrentUser } from "@/core/notifications/queries";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { VersionBadge } from "@/components/version-badge";
+import { BackupReminder } from "@/components/backup-reminder";
+import { getBackupReminderSettings, isBackupReminderDue } from "@/core/backup";
+import { formatDateTime } from "@/core/format";
 import { OrgBrandingStyle } from "@/components/org-branding-style";
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard";
 import { BrandIcon } from "@/components/brand-icon";
@@ -77,6 +80,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // próprio admin.
   const openSession = org.impersonating ? null : await getOpenSessionForMyOrg();
   const notifications = await listNotificationsForCurrentUser();
+
+  // Lembrete de backup: só para o responsável da conta e nunca no modo suporte
+  // (quem está "usando" a organização ali é o dono da plataforma).
+  const backupReminder =
+    org.role === "owner" && !org.impersonating
+      ? await withDb((tx) => getBackupReminderSettings(tx, org.organizationId))
+      : null;
 
   return (
     <div className="flex min-h-screen flex-1 flex-col">
@@ -166,7 +176,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </header>
 
-          <main className="flex-1 p-4 md:p-6 print:p-0">{children}</main>
+          <main className="flex-1 p-4 md:p-6 print:p-0">
+            {backupReminder && (
+              <BackupReminder
+                due={isBackupReminderDue(backupReminder, new Date())}
+                reminderHours={backupReminder.reminderHours}
+                lastDownloadLabel={
+                  backupReminder.lastDownloadAt
+                    ? `Último backup baixado em ${formatDateTime(backupReminder.lastDownloadAt)}`
+                    : null
+                }
+                organizationId={org.organizationId}
+              />
+            )}
+            {children}
+          </main>
         </div>
       </div>
 

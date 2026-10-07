@@ -1,3 +1,4 @@
+import "@/core/load-modules"; // Sem o layout (Route Handler / Server Action), é isto que registra as tabelas de cada módulo em `registerBackupTable` — sem isso o backup sai VAZIO.
 import { NextRequest } from "next/server";
 import { requireEnv } from "@/core/env";
 import { logger } from "@/core/logger";

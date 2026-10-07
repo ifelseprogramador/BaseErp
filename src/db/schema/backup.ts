@@ -1,4 +1,4 @@
-import { pgTable, uuid, boolean, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, boolean, integer, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { organizations } from "./tenancy";
 
 /**
@@ -11,6 +11,12 @@ export const organizationBackupSettings = pgTable("organization_backup_settings"
     .primaryKey()
     .references(() => organizations.id, { onDelete: "cascade" }),
   autoBackupEnabled: boolean("auto_backup_enabled").notNull().default(true),
+  // Lembrete para o responsável baixar um backup: a cada `reminderHours` horas sem
+  // baixar (0 = não lembrar). `lastDownloadAt` é a última vez que ele baixou/
+  // compartilhou um backup — o servidor grava ao entregar o arquivo (nunca no
+  // modo suporte do dono da plataforma).
+  reminderHours: integer("reminder_hours").notNull().default(3),
+  lastDownloadAt: timestamp("last_download_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

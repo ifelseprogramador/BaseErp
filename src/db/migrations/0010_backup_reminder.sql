@@ -1,0 +1,2 @@
+ALTER TABLE "organization_backup_settings" ADD COLUMN "reminder_hours" integer DEFAULT 3 NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization_backup_settings" ADD COLUMN "last_download_at" timestamp with time zone;

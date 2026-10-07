@@ -4,15 +4,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BackupDownloadButton } from "@/components/backup-download-button";
 import { BackupRestoreForm } from "@/components/backup-restore-form";
 import { AutoBackupToggle } from "@/components/auto-backup-toggle";
-import { getAutoBackupEnabled, listAutomaticBackups } from "@/core/backup";
+import { BackupReminderSettings } from "@/components/backup-reminder-settings";
+import {
+  getAutoBackupEnabled,
+  getBackupReminderSettings,
+  listAutomaticBackups,
+} from "@/core/backup";
 import { requireOwner } from "@/core/auth";
 import { formatDate } from "@/core/format";
 
 export default async function BackupPage() {
   const { organizationId, withDb } = await requireOwner();
-  const [autoBackupEnabled, automaticBackups] = await withDb((tx) =>
+  const [autoBackupEnabled, reminder, automaticBackups] = await withDb((tx) =>
     Promise.all([
       getAutoBackupEnabled(tx, organizationId),
+      getBackupReminderSettings(tx, organizationId),
       listAutomaticBackups(tx, organizationId),
     ]),
   );
@@ -38,6 +44,7 @@ export default async function BackupPage() {
         <CardContent className="flex flex-col gap-4">
           <BackupDownloadButton />
           <AutoBackupToggle initialEnabled={autoBackupEnabled} />
+          <BackupReminderSettings initialHours={reminder.reminderHours} />
         </CardContent>
       </Card>
 

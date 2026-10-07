@@ -1,3 +1,4 @@
+import "@/core/load-modules"; // Sem o layout (Route Handler / Server Action), é isto que registra as tabelas de cada módulo em `registerBackupTable` — sem isso o backup sai VAZIO.
 import { NotPlatformAdminError, requireAdmin } from "@/core/admin-auth";
 import { buildSystemBackup } from "@/core/backup";
 

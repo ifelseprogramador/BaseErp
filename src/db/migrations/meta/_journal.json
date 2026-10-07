@@ -71,6 +71,13 @@
       "when": 1791399021735,
       "tag": "0009_login_history",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791405904942,
+      "tag": "0010_backup_reminder",
+      "breakpoints": true
     }
   ]
 }

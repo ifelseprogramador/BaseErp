@@ -1178,3 +1178,32 @@ com `opacity: 0`: o Dialog entra com `animate-in fade-in-0` e, no replay, a anim
 O mesmo vale para qualquer janela/aviso com animação de entrada. O `Replayer` agora recebe
 `insertStyleRules` com `animation: none; transition: none` (`REPLAY_NO_ANIMATION_CSS`), então tudo
 aparece direto no estado final. Só afeta o espelho do suporte; a tela da pessoa continua animada.
+
+## 2026-10-07 — Lembrete de backup e backup que restaura de verdade
+
+**Lembrete.** `organization_backup_settings` ganhou `reminder_hours` (padrão 3; 0 = desligado; opções
+em `core/backup-reminder.ts`) e `last_download_at`. O servidor grava `last_download_at` ao entregar um
+backup (`/backup/exportar` e `/backup/automatico/[id]`) — nunca no modo suporte, onde quem baixa é o
+dono da plataforma. O layout do app calcula `due` (passou do intervalo desde o último download) e
+mostra o `BackupReminder` só ao responsável (`owner`), fora do modo suporte e fora de `/backup`. O
+texto explica por que fazer backup e que a frequência muda em Backup → Lembrete de backup ("Lembrar
+mais tarde" esconde por esse mesmo intervalo, neste aparelho). Baixar o backup dá `router.refresh()`
+e o aviso some.
+
+**Backup incompleto (achado na revisão).** O motor só pegava tabelas com `organization_id` direto:
+ficavam de fora os itens (`pedido_itens` / `work_order_items`) — uma restauração traria pedidos/ordens
+SEM itens e sem valores. Agora `registerBackupTable({ parent: { table, foreignKey } })` cobre tabelas
+filhas pela tabela-pai (registrar o pai antes), `afterRestore` ajusta os contadores de numeração
+(`pedido_counters` / `work_order_counters` nunca ficam abaixo do maior número existente) e colunas
+geradas (`total_cents`) saem da linha ao restaurar (o Postgres recusa valor nelas). Ao restaurar, só
+entram itens cujo pai é da organização de quem restaura (arquivo adulterado não enxerta itens em
+registros de outra organização).
+
+**Backup VAZIO no Mecano.** Route Handlers e Server Actions não passam pelo layout; só o Prisma
+importava `@/core/load-modules` neles. No Mecano o cron e o download saíam com `tables` vazio (visto em
+`organization_backups`: sem tabelas). Agora toda rota/ação que gera ou restaura backup importa
+`@/core/load-modules` e `core/__tests__/backup-routes.test.ts` falha se uma nova esquecer. Backups
+automáticos antigos do Mecano continuam vazios — o próximo ciclo do cron (ou uma chamada manual ao
+`/api/cron/backup`) gera os corretos. Verificado num Postgres em memória (PGlite): backup → apagar
+tudo → restaurar devolve as mesmas linhas (inclusive `total_cents`), 2ª restauração não duplica e o
+contador se corrige; a organização vizinha não é tocada.

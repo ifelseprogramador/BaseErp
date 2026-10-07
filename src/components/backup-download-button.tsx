@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, Loader2, Share2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 export function BackupDownloadButton() {
   const [isLoading, setIsLoading] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     // `navigator` não existe no render do servidor — só sabe se o
@@ -52,6 +54,9 @@ export function BackupDownloadButton() {
       setIsLoading(false);
       return;
     }
+
+    // O servidor já registrou o backup: atualiza a tela (some o lembrete de backup).
+    router.refresh();
 
     // Daqui pra baixo o arquivo JÁ EXISTE — compartilhar é só um "a mais".
     // `await fetch()` acima consome a "ativação transitória" que o clique

@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.15.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: "Lembrete de backup: o sistema avisa o responsável, a cada 3 horas (ou no intervalo que ele escolher em Backup), para baixar um backup e não perder o que foi feito se houver uma falha. Baixar o backup zera o lembrete.",
+      },
+    ],
+  },
+  {
     version: "0.14.1",
     date: "2026-10-07",
     changes: [

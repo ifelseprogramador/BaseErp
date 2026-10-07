@@ -3,6 +3,19 @@ import { and, desc, eq, getTableColumns, inArray, type Table } from "drizzle-orm
 import type { Database } from "@/core/db";
 import { organizations } from "@/db/schema/tenancy";
 import { organizationBackupSettings, organizationBackups } from "@/db/schema/backup";
+import {
+  DEFAULT_BACKUP_REMINDER_HOURS,
+  isValidReminderHours,
+  type BackupReminderSettings,
+} from "@/core/backup-reminder";
+
+export {
+  BACKUP_REMINDER_OPTIONS,
+  DEFAULT_BACKUP_REMINDER_HOURS,
+  isBackupReminderDue,
+  isValidReminderHours,
+  type BackupReminderSettings,
+} from "@/core/backup-reminder";
 
 /** Quantos backups automáticos guardar por organização (padrão) — o
  * cron (`api/cron/backup/route.ts`) apaga os mais antigos além disso a
@@ -81,6 +94,47 @@ interface BackupTableDefinition {
   key: string;
   table: Table;
   dateColumns?: string[];
+  /**
+   * Tabela SEM `organizationId` próprio (ex.: itens de um pedido/ordem): pertence à
+   * organização pela tabela-pai. `foreignKey` é o nome (na tabela filha) da coluna
+   * que aponta para `parent.table.id`. A tabela-pai (que TEM `organizationId`) precisa
+   * ser registrada ANTES — a restauração segue a ordem de registro.
+   */
+  parent?: { table: Table; foreignKey: string };
+  /** Roda depois de restaurar esta tabela (ex.: ajustar contadores de numeração). */
+  afterRestore?: (db: Database, organizationId: string) => Promise<void>;
+}
+
+/**
+ * Colunas GERADAS pelo banco (ex.: `total_cents = quantity * unit_price_cents`): o
+ * Postgres recusa um insert que informe valor para elas, então saem da linha antes
+ * de restaurar (o banco recalcula).
+ */
+function withoutGeneratedColumns(table: Table, row: Record<string, unknown>) {
+  const generated = Object.entries(getTableColumns(table))
+    .filter(([, col]) => col.generated)
+    .map(([key]) => key);
+  if (generated.length === 0) return row;
+  const copy = { ...row };
+  for (const key of generated) delete copy[key];
+  return copy;
+}
+
+/** Colunas `organizationId`/`id`/chave estrangeira de uma tabela, sem tipo forte. */
+function column(table: Table, name: string) {
+  return (table as unknown as Record<string, never>)[name];
+}
+
+/** Condição "esta linha é da organização", com ou sem `organizationId` direto. */
+function belongsToOrg(db: Database, def: BackupTableDefinition, organizationId: string) {
+  if (def.parent) {
+    const parentIds = db
+      .select({ id: column(def.parent.table, "id") })
+      .from(def.parent.table)
+      .where(eq(column(def.parent.table, "organizationId"), organizationId));
+    return inArray(column(def.table, def.parent.foreignKey), parentIds);
+  }
+  return eq(column(def.table, "organizationId"), organizationId);
 }
 
 /**
@@ -114,11 +168,10 @@ export async function buildOrgBackup(
   const tables: Record<string, TableBackup> = {};
 
   for (const def of BACKUP_TABLES) {
-    const orgIdColumn = (def.table as unknown as Record<string, { name: string }>).organizationId;
     const rows = await db
       .select()
       .from(def.table)
-      .where(eq(orgIdColumn as never, organizationId));
+      .where(belongsToOrg(db, def, organizationId));
     tables[def.key] = { columns: describeColumns(def.table), rows };
   }
 
@@ -154,18 +207,38 @@ export async function restoreOrgBackup(
     const rows = tableBackup?.rows ?? [];
     if (rows.length === 0) {
       summary.push({ table: def.key, inserted: 0, skipped: 0 });
+      await def.afterRestore?.(db, organizationId);
       continue;
     }
-    const stamped = rows.map((row) => ({
-      ...reviveDates(row, def.key),
-      organizationId,
-    }));
-    const inserted = await db.insert(def.table).values(stamped).onConflictDoNothing().returning();
+    let toInsert: Record<string, unknown>[];
+    if (def.parent) {
+      // Sem `organizationId` na linha: só entra o que aponta para uma tabela-pai DESTA
+      // organização (já restaurada acima) — um arquivo editado à mão não consegue
+      // pendurar itens em registros de outra organização.
+      const own = await db
+        .select({ id: column(def.parent.table, "id") })
+        .from(def.parent.table)
+        .where(eq(column(def.parent.table, "organizationId"), organizationId));
+      const ownIds = new Set(own.map((r) => String((r as { id: unknown }).id)));
+      toInsert = rows
+        .filter((row) => ownIds.has(String(row[def.parent!.foreignKey])))
+        .map((row) => withoutGeneratedColumns(def.table, reviveDates(row, def.key)));
+    } else {
+      toInsert = rows.map((row) => ({
+        ...withoutGeneratedColumns(def.table, reviveDates(row, def.key)),
+        organizationId,
+      }));
+    }
+    const inserted =
+      toInsert.length > 0
+        ? await db.insert(def.table).values(toInsert).onConflictDoNothing().returning()
+        : [];
     summary.push({
       table: def.key,
       inserted: inserted.length,
       skipped: rows.length - inserted.length,
     });
+    await def.afterRestore?.(db, organizationId);
   }
 
   return summary;
@@ -304,4 +377,44 @@ export async function getAutomaticBackup(
     .limit(1);
 
   return (row?.data as BackupFile) ?? null;
+}
+
+/** Sem linha de configuração = lembrete a cada 3 horas, nunca baixou. */
+export async function getBackupReminderSettings(
+  db: Database,
+  organizationId: string,
+): Promise<BackupReminderSettings> {
+  const [row] = await db
+    .select({
+      reminderHours: organizationBackupSettings.reminderHours,
+      lastDownloadAt: organizationBackupSettings.lastDownloadAt,
+    })
+    .from(organizationBackupSettings)
+    .where(eq(organizationBackupSettings.organizationId, organizationId))
+    .limit(1);
+
+  return row ?? { reminderHours: DEFAULT_BACKUP_REMINDER_HOURS, lastDownloadAt: null };
+}
+
+export async function setBackupReminderHours(db: Database, organizationId: string, hours: number) {
+  if (!isValidReminderHours(hours)) throw new Error(`Intervalo de lembrete inválido: ${hours}`);
+  await db
+    .insert(organizationBackupSettings)
+    .values({ organizationId, reminderHours: hours })
+    .onConflictDoUpdate({
+      target: organizationBackupSettings.organizationId,
+      set: { reminderHours: hours, updatedAt: new Date() },
+    });
+}
+
+/** Registra que o responsável acabou de baixar um backup (zera o lembrete). */
+export async function markBackupDownloaded(db: Database, organizationId: string) {
+  const now = new Date();
+  await db
+    .insert(organizationBackupSettings)
+    .values({ organizationId, lastDownloadAt: now })
+    .onConflictDoUpdate({
+      target: organizationBackupSettings.organizationId,
+      set: { lastDownloadAt: now, updatedAt: now },
+    });
 }

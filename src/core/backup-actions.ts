@@ -1,10 +1,14 @@
 "use server";
 
+import "@/core/load-modules"; // Sem o layout (Route Handler / Server Action), é isto que registra as tabelas de cada módulo em `registerBackupTable` — sem isso o backup sai VAZIO.
+
 import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/core/auth";
 import {
+  isValidReminderHours,
   restoreOrgBackup,
   setAutoBackupEnabled,
+  setBackupReminderHours,
   type BackupFile,
   type RestoreSummary,
 } from "@/core/backup";
@@ -70,6 +74,18 @@ export async function toggleAutoBackup(enabled: boolean): Promise<ActionResult> 
   const { organizationId, log, withDb } = await requireOwner();
   await withDb((tx) => setAutoBackupEnabled(tx, organizationId, enabled));
   log.info("backup.automatico.alternar", { enabled });
+  revalidatePath("/backup");
+  return { ok: true };
+}
+
+/** Frequência do lembrete de backup (horas; 0 = desligado) — só o responsável altera. */
+export async function updateBackupReminder(hours: number): Promise<ActionResult> {
+  const { organizationId, log, withDb } = await requireOwner();
+  if (!isValidReminderHours(hours)) {
+    return { ok: false, message: "Escolha uma das frequências da lista." };
+  }
+  await withDb((tx) => setBackupReminderHours(tx, organizationId, hours));
+  log.info("backup.lembrete.alterar", { hours });
   revalidatePath("/backup");
   return { ok: true };
 }
