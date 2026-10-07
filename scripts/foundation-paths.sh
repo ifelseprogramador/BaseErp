@@ -79,6 +79,8 @@ FOUNDATION_PATHS=(
   "src/core/admin/components/support-requests.ts"
   "src/core/admin/components/admin-presence-beacon.tsx"
   "src/core/admin/components/support-settings-card.tsx"
+  "src/core/admin/components/collapsible-card.tsx"
+  "src/core/admin/__tests__/collapsible-card.test.tsx"
   "src/core/status-history.ts"
   "src/components/audit-stamp.tsx"
   "src/components/status-timeline.tsx"

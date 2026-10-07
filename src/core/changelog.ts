@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.11.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: "Painel do admin: os blocos da ficha da empresa (suporte ao vivo, cobrança, usuários, módulos, histórico etc.) e o do Telegram agora começam recolhidos e abrem ao clicar no título. O suporte ao vivo já abre sozinho quando há uma conversa ou tela em andamento.",
+      },
+    ],
+  },
+  {
     version: "0.10.3",
     date: "2026-10-07",
     changes: [

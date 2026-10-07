@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { BackButton } from "@/components/back-button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/core/admin-auth";
 import { getOrganizationForAdmin } from "@/core/admin/queries";
 import {
@@ -19,6 +18,7 @@ import { OrgSupportWaitForm } from "@/core/admin/components/org-support-wait-for
 import { ModuleToggleList } from "@/core/admin/components/module-toggle-list";
 import { HardDeleteForm } from "@/core/admin/components/hard-delete-form";
 import { ResetMemberPasswordButton } from "@/core/admin/components/reset-member-password-button";
+import { CollapsibleCard } from "@/core/admin/components/collapsible-card";
 import { AuditLogCard } from "@/core/admin/components/audit-log-card";
 import { LiveSupportCard } from "@/core/admin/components/live-support-card";
 import { getAllModules } from "@/core/registry";
@@ -98,97 +98,71 @@ export default async function AdminOrganizationDetailPage({
         }
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cobrança</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <BillingForm
-            billingStatus={org.billingStatus}
-            nextDueDate={org.nextDueDate}
-            billingNotes={org.billingNotes}
-            action={updateBillingWithId}
-          />
-        </CardContent>
-      </Card>
+      <CollapsibleCard title="Cobrança">
+        <BillingForm
+          billingStatus={org.billingStatus}
+          nextDueDate={org.nextDueDate}
+          billingNotes={org.billingNotes}
+          action={updateBillingWithId}
+        />
+      </CollapsibleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Atendimento de suporte</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <OrgSupportWaitForm organizationId={org.id} initialSeconds={org.supportWaitSeconds} />
-        </CardContent>
-      </Card>
+      <CollapsibleCard title="Atendimento de suporte">
+        <OrgSupportWaitForm organizationId={org.id} initialSeconds={org.supportWaitSeconds} />
+      </CollapsibleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Usuários</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SeatsForm
-            multiUser={org.multiUser}
-            seatLimit={org.seatLimit}
-            extraSeatPriceCents={org.extraSeatPriceCents}
-            activeCount={activeCount}
-            action={updateSeatsWithId}
-          />
-        </CardContent>
-      </Card>
+      <CollapsibleCard title="Usuários">
+        <SeatsForm
+          multiUser={org.multiUser}
+          seatLimit={org.seatLimit}
+          extraSeatPriceCents={org.extraSeatPriceCents}
+          activeCount={activeCount}
+          action={updateSeatsWithId}
+        />
+      </CollapsibleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Módulos habilitados (personalização)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ModuleToggleList organizationId={org.id} modules={modules} />
-        </CardContent>
-      </Card>
+      <CollapsibleCard title="Módulos habilitados (personalização)">
+        <ModuleToggleList organizationId={org.id} modules={modules} />
+      </CollapsibleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pessoas com acesso</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {members.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhum usuário vinculado.</p>
-          ) : (
-            <ul className="flex flex-col gap-3 text-sm">
-              {members.map((m) => (
-                <li key={m.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    {/* m.name já resolve pra display_name (Perfil), senão
+      <CollapsibleCard title="Pessoas com acesso">
+        {members.length === 0 ? (
+          <p className="text-muted-foreground text-sm">Nenhum usuário vinculado.</p>
+        ) : (
+          <ul className="flex flex-col gap-3 text-sm">
+            {members.map((m) => (
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  {/* m.name já resolve pra display_name (Perfil), senão
                         e-mail, senão o próprio UID (core/user-lookup.ts)
                         — nunca precisa repetir o e-mail aqui embaixo. */}
-                    <p className="truncate">{m.name}</p>
-                    <p className="text-muted-foreground truncate font-mono text-xs">{m.userId}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{m.role === "owner" ? "Dono" : "Equipe"}</Badge>
-                    {!m.active && <Badge variant="destructive">Bloqueado</Badge>}
-                    <ResetMemberPasswordButton
-                      organizationId={org.id}
-                      userId={m.userId}
-                      label={m.name}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                  <p className="truncate">{m.name}</p>
+                  <p className="text-muted-foreground truncate font-mono text-xs">{m.userId}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{m.role === "owner" ? "Dono" : "Equipe"}</Badge>
+                  {!m.active && <Badge variant="destructive">Bloqueado</Badge>}
+                  <ResetMemberPasswordButton
+                    organizationId={org.id}
+                    userId={m.userId}
+                    label={m.name}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CollapsibleCard>
 
       <AuditLogCard organizationId={org.id} entries={audit} />
 
-      <Card className="border-destructive/50">
-        <CardHeader>
-          <CardTitle className="text-destructive">Zona de risco</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <HardDeleteForm organizationName={org.name} action={hardDeleteWithId} />
-        </CardContent>
-      </Card>
+      <CollapsibleCard
+        title="Zona de risco"
+        className="border-destructive/50"
+        titleClassName="text-destructive"
+      >
+        <HardDeleteForm organizationName={org.name} action={hardDeleteWithId} />
+      </CollapsibleCard>
     </div>
   );
 }

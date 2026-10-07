@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "./collapsible-card";
 import {
   getTelegramWebhookStatus,
   registerTelegramWebhook,
@@ -65,87 +65,82 @@ export function SupportSettingsCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Telegram do atendimento</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <p className="text-muted-foreground text-xs">
-          Quando alguém chama o suporte e você não está com este painel aberto (ou o tempo de espera
-          da empresa acaba), o aviso chega no Telegram. Se você <strong>responder</strong> a
-          mensagem lá, a resposta aparece na caixa de conversa da pessoa; quando ela liberar a tela,
-          a conversa continua aqui no painel. O tempo de espera de cada empresa fica na ficha dela.
-        </p>
+    <CollapsibleCard title="Telegram do atendimento" contentClassName="flex flex-col gap-3">
+      <p className="text-muted-foreground text-xs">
+        Quando alguém chama o suporte e você não está com este painel aberto (ou o tempo de espera
+        da empresa acaba), o aviso chega no Telegram. Se você <strong>responder</strong> a mensagem
+        lá, a resposta aparece na caixa de conversa da pessoa; quando ela liberar a tela, a conversa
+        continua aqui no painel. O tempo de espera de cada empresa fica na ficha dela.
+      </p>
 
-        <p className={telegramConfigured ? "text-xs text-emerald-600" : "text-destructive text-xs"}>
-          {telegramConfigured
-            ? "Avisos configurados (token e chat id)."
-            : "Avisos NÃO configurados: defina TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID nas variáveis de ambiente."}
-        </p>
+      <p className={telegramConfigured ? "text-xs text-emerald-600" : "text-destructive text-xs"}>
+        {telegramConfigured
+          ? "Avisos configurados (token e chat id)."
+          : "Avisos NÃO configurados: defina TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID nas variáveis de ambiente."}
+      </p>
+      <p
+        className={
+          webhookSecretConfigured ? "text-xs text-emerald-600" : "text-muted-foreground text-xs"
+        }
+      >
+        {webhookSecretConfigured
+          ? "Segredo das respostas definido (TELEGRAM_WEBHOOK_SECRET)."
+          : "Para responder pelo Telegram, defina também TELEGRAM_WEBHOOK_SECRET (uma senha longa e aleatória)."}
+      </p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleTest}
+          disabled={isTesting || !telegramConfigured}
+        >
+          {isTesting ? "Enviando..." : "Enviar mensagem de teste"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleRegister}
+          disabled={isRegistering || !telegramConfigured || !webhookSecretConfigured}
+        >
+          {isRegistering ? "Registrando..." : "Ativar respostas pelo Telegram"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleCheck}
+          disabled={isChecking || !telegramConfigured}
+        >
+          {isChecking ? "Consultando..." : "Verificar situação"}
+        </Button>
+      </div>
+
+      {status && (
         <p
           className={
-            webhookSecretConfigured ? "text-xs text-emerald-600" : "text-muted-foreground text-xs"
+            status.ok && status.matchesThisSite
+              ? "text-xs text-emerald-600"
+              : status.ok && status.url
+                ? "text-destructive text-xs"
+                : "text-muted-foreground text-xs"
           }
         >
-          {webhookSecretConfigured
-            ? "Segredo das respostas definido (TELEGRAM_WEBHOOK_SECRET)."
-            : "Para responder pelo Telegram, defina também TELEGRAM_WEBHOOK_SECRET (uma senha longa e aleatória)."}
+          {!status.ok
+            ? status.message
+            : !status.url
+              ? "Respostas pelo Telegram: NÃO ativadas (nenhum endereço registrado)."
+              : status.matchesThisSite
+                ? `Respostas pelo Telegram ativas neste sistema.${
+                    status.lastErrorMessage
+                      ? ` Último erro do Telegram: ${status.lastErrorMessage}`
+                      : ""
+                  }`
+                : `O bot está apontado para outro endereço (${status.url}). Clique em "Ativar respostas pelo Telegram" para apontar para este sistema.`}
         </p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleTest}
-            disabled={isTesting || !telegramConfigured}
-          >
-            {isTesting ? "Enviando..." : "Enviar mensagem de teste"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleRegister}
-            disabled={isRegistering || !telegramConfigured || !webhookSecretConfigured}
-          >
-            {isRegistering ? "Registrando..." : "Ativar respostas pelo Telegram"}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleCheck}
-            disabled={isChecking || !telegramConfigured}
-          >
-            {isChecking ? "Consultando..." : "Verificar situação"}
-          </Button>
-        </div>
-
-        {status && (
-          <p
-            className={
-              status.ok && status.matchesThisSite
-                ? "text-xs text-emerald-600"
-                : status.ok && status.url
-                  ? "text-destructive text-xs"
-                  : "text-muted-foreground text-xs"
-            }
-          >
-            {!status.ok
-              ? status.message
-              : !status.url
-                ? "Respostas pelo Telegram: NÃO ativadas (nenhum endereço registrado)."
-                : status.matchesThisSite
-                  ? `Respostas pelo Telegram ativas neste sistema.${
-                      status.lastErrorMessage
-                        ? ` Último erro do Telegram: ${status.lastErrorMessage}`
-                        : ""
-                    }`
-                  : `O bot está apontado para outro endereço (${status.url}). Clique em "Ativar respostas pelo Telegram" para apontar para este sistema.`}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </CollapsibleCard>
   );
 }

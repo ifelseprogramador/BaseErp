@@ -1113,3 +1113,13 @@ pessoa: o botão de recolher é minúsculo no espelho reduzido (no celular) e o 
 botão de recolher/expandir; `left/right/up/down` mandam 3 passos de seta (16 px cada) à barra da
 conversa, reaproveitando o movimento por teclado do `DraggablePanel`. O viewer ganhou os botões
 "Recolher/expandir" e as quatro setas ao lado dos de rolar.
+
+## 2026-10-07 — Cartões do admin recolhidos por padrão
+
+A ficha da empresa em `/admin` tem muitos blocos; agora cada um é um `CollapsibleCard`
+(`core/admin/components/collapsible-card.tsx`): começa recolhido e abre/fecha ao clicar no título
+(`aria-expanded`). O conteúdo continua MONTADO quando recolhido (atributo `hidden`), para não perder
+o que foi digitado nos formulários nem derrubar a conexão do suporte ao vivo. Exceções: "Suporte ao
+vivo" abre sozinho se já há pedido/conversa/tela em andamento (`defaultOpen`); as ações do cabeçalho
+(ex.: "Limpar tudo" do histórico) só aparecem com o cartão aberto. A caixa de pedidos de suporte
+(`SupportInbox`) NÃO é recolhível: é um alerta e precisa ficar à vista.

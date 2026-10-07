@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "./collapsible-card";
 import {
   Dialog,
   DialogContent,
@@ -80,10 +80,10 @@ export function AuditLogCard({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle>Histórico (auditoria)</CardTitle>
-        {entries.length > 0 && (
+    <CollapsibleCard
+      title="Histórico (auditoria)"
+      actions={
+        entries.length > 0 && (
           <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
             <DialogTrigger render={<Button variant="outline" size="sm" />} disabled={isPending}>
               <Trash2 className="h-4 w-4" />
@@ -107,43 +107,42 @@ export function AuditLogCard({
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
-      </CardHeader>
-      <CardContent>
-        {entries.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhuma ação registrada ainda.</p>
-        ) : (
-          <ul className="flex max-h-80 flex-col gap-3 overflow-y-auto pr-1 text-sm">
-            {entries.map((entry) => (
-              <li key={entry.id} className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="font-medium">{ACTION_LABELS[entry.action] ?? entry.action}</p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {entry.actorName}
-                    {entry.actorName !== entry.actorUserId && (
-                      <span className="font-mono"> · {entry.actorUserId}</span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-muted-foreground text-xs">
-                    {formatDateTime(entry.createdAt)}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Apagar entrada"
-                    disabled={isPending}
-                    onClick={() => handleDeleteEntry(entry.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+        )
+      }
+    >
+      {entries.length === 0 ? (
+        <p className="text-muted-foreground text-sm">Nenhuma ação registrada ainda.</p>
+      ) : (
+        <ul className="flex max-h-80 flex-col gap-3 overflow-y-auto pr-1 text-sm">
+          {entries.map((entry) => (
+            <li key={entry.id} className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium">{ACTION_LABELS[entry.action] ?? entry.action}</p>
+                <p className="text-muted-foreground truncate text-xs">
+                  {entry.actorName}
+                  {entry.actorName !== entry.actorUserId && (
+                    <span className="font-mono"> · {entry.actorUserId}</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-muted-foreground text-xs">
+                  {formatDateTime(entry.createdAt)}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Apagar entrada"
+                  disabled={isPending}
+                  onClick={() => handleDeleteEntry(entry.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </CollapsibleCard>
   );
 }

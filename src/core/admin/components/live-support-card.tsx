@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Headset } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "./collapsible-card";
 import { requestSupportAccess } from "@/core/live-support/actions";
 import { LiveSessionViewer } from "@/core/live-support/components/live-session-viewer";
 
@@ -47,43 +47,39 @@ export function LiveSupportCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Suporte ao vivo</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {!session ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {targets.length > 1 && (
-              <select
-                value={targetId}
-                onChange={(e) => setTargetId(e.target.value)}
-                aria-label="Pessoa cuja tela será acompanhada"
-                className="border-input h-8 rounded-lg border bg-transparent px-2.5 text-sm"
-              >
-                {targets.map((t) => (
-                  <option key={t.userId} value={t.userId}>
-                    {t.name}
-                    {t.role === "owner" ? " (responsável)" : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-            <Button variant="outline" onClick={handleRequest} disabled={isPending || !targetId}>
-              <Headset className="h-4 w-4" />
-              {isPending ? "Solicitando..." : "Solicitar acesso à tela"}
-            </Button>
-          </div>
-        ) : (
-          <LiveSessionViewer
-            sessionId={session.id}
-            initialStatus={session.status}
-            initialScreenRequested={session.screenRequested}
-            initialControlGranted={session.controlGranted}
-            onEnded={() => setSession(null)}
-          />
-        )}
-      </CardContent>
-    </Card>
+    // Aberto quando já há uma sessão em andamento (pedido, conversa ou tela).
+    <CollapsibleCard title="Suporte ao vivo" defaultOpen={initialSession !== null}>
+      {!session ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {targets.length > 1 && (
+            <select
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+              aria-label="Pessoa cuja tela será acompanhada"
+              className="border-input h-8 rounded-lg border bg-transparent px-2.5 text-sm"
+            >
+              {targets.map((t) => (
+                <option key={t.userId} value={t.userId}>
+                  {t.name}
+                  {t.role === "owner" ? " (responsável)" : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button variant="outline" onClick={handleRequest} disabled={isPending || !targetId}>
+            <Headset className="h-4 w-4" />
+            {isPending ? "Solicitando..." : "Solicitar acesso à tela"}
+          </Button>
+        </div>
+      ) : (
+        <LiveSessionViewer
+          sessionId={session.id}
+          initialStatus={session.status}
+          initialScreenRequested={session.screenRequested}
+          initialControlGranted={session.controlGranted}
+          onEnded={() => setSession(null)}
+        />
+      )}
+    </CollapsibleCard>
   );
 }
