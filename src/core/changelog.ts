@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.15.1",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: '"Ativar respostas pelo Telegram" passa a funcionar em produção mesmo sem a variável NEXT_PUBLIC_SITE_URL: usa o endereço pelo qual o dono está acessando o painel.',
+      },
+    ],
+  },
+  {
     version: "0.15.0",
     date: "2026-10-07",
     changes: [

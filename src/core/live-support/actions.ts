@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { withOrg, getSession } from "@/core/auth";
@@ -82,7 +83,25 @@ async function getWaitSeconds(db: Database, organizationId: string): Promise<num
 
 function siteOrigin(): string | undefined {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  return configured ? configured.replace(/\/+$/, "") : undefined;
+  if (configured) return configured.replace(/\/+$/, "");
+  // Sem a variável: o domínio de produção que a própria Vercel expõe (sem protocolo).
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  return vercelHost
+    ? `https://${vercelHost.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`
+    : undefined;
+}
+
+/**
+ * Origem para as ações do painel do dono: a configurada (`NEXT_PUBLIC_SITE_URL`/Vercel) ou,
+ * na falta, o endereço pelo qual ele está acessando AGORA — nunca `localhost`.
+ */
+async function adminOrigin(): Promise<string | undefined> {
+  const configured = siteOrigin();
+  if (configured) return configured;
+  const list = await headers();
+  const host = list.get("x-forwarded-host") ?? list.get("host");
+  if (!host || /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(host)) return undefined;
+  return `${list.get("x-forwarded-proto") ?? "https"}://${host}`;
 }
 
 /** Avisa o dono da plataforma de um pedido sem atendimento: Telegram +
@@ -1013,7 +1032,7 @@ export async function sendTelegramTest(): Promise<ActionResult> {
 export async function registerTelegramWebhook(): Promise<ActionResult> {
   const { log } = await requireAdmin();
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
-  const origin = siteOrigin();
+  const origin = await adminOrigin();
   if (!secret) {
     return {
       ok: false,
@@ -1064,7 +1083,7 @@ export async function getTelegramWebhookStatus(): Promise<TelegramWebhookStatus>
           : "Não foi possível consultar o Telegram agora.",
     };
   }
-  const origin = siteOrigin();
+  const origin = await adminOrigin();
   return {
     ok: true,
     url: result.info.url,

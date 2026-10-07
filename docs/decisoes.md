@@ -1207,3 +1207,13 @@ automáticos antigos do Mecano continuam vazios — o próximo ciclo do cron (ou
 `/api/cron/backup`) gera os corretos. Verificado num Postgres em memória (PGlite): backup → apagar
 tudo → restaurar devolve as mesmas linhas (inclusive `total_cents`), 2ª restauração não duplica e o
 contador se corrige; a organização vizinha não é tocada.
+
+## 2026-10-07 — Endereço público do Telegram sem depender da variável
+
+"Ativar respostas pelo Telegram" exigia `NEXT_PUBLIC_SITE_URL` HTTPS e falhava em produção quando ela
+não estava definida (ou foi definida depois do build — variável `NEXT_PUBLIC_` é embutida no build).
+Agora a origem é, nesta ordem: `NEXT_PUBLIC_SITE_URL`; `VERCEL_PROJECT_PRODUCTION_URL` (domínio de
+produção que a Vercel expõe); e, nas ações do painel do dono (`registerTelegramWebhook` e
+`getTelegramWebhookStatus`), o host pelo qual ele acessa agora — nunca localhost. Se o bot ainda
+aponta para um endereço de teste (ngrok), clicar em "Ativar respostas pelo Telegram" no domínio de
+produção o reaponta.
