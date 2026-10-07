@@ -46,7 +46,14 @@ function locationLabel(entry: LoginEntry): string {
   return formatLocation(entry) ?? (isPrivateIp(entry.ip) ? "Rede local" : "Não identificada");
 }
 
-export function LoginHistoryCard({ entries: initialEntries }: { entries: LoginEntry[] }) {
+export function LoginHistoryCard({
+  entries: initialEntries,
+  organizationId,
+}: {
+  entries: LoginEntry[];
+  /** Na ficha de uma organização: só os acessos dela. Sem isso, o histórico geral. */
+  organizationId?: string;
+}) {
   const [entries, setEntries] = useState(initialEntries);
   const [isPending, startTransition] = useTransition();
   const [clearOpen, setClearOpen] = useState(false);
@@ -63,7 +70,7 @@ export function LoginHistoryCard({ entries: initialEntries }: { entries: LoginEn
     setEntries([]);
     setClearOpen(false);
     startTransition(async () => {
-      const result = await clearLoginEvents();
+      const result = await clearLoginEvents(organizationId);
       if (result.ok) toast.success("Histórico de acessos limpo.");
       else toast.error(result.message ?? "Não foi possível limpar o histórico.");
     });
@@ -71,7 +78,9 @@ export function LoginHistoryCard({ entries: initialEntries }: { entries: LoginEn
 
   return (
     <CollapsibleCard
-      title="Histórico de acessos"
+      title={
+        organizationId ? "Histórico de acessos" : "Histórico de acessos (todas as organizações)"
+      }
       actions={
         entries.length > 0 && (
           <Dialog open={clearOpen} onOpenChange={setClearOpen}>
@@ -83,8 +92,11 @@ export function LoginHistoryCard({ entries: initialEntries }: { entries: LoginEn
               <DialogHeader>
                 <DialogTitle>Limpar histórico de acessos</DialogTitle>
                 <DialogDescription>
-                  Apaga os {entries.length} registros de acesso exibidos (e todos os demais). Não
-                  afeta contas nem dados de ninguém. Não tem volta.
+                  Apaga{" "}
+                  {organizationId
+                    ? "os acessos das pessoas desta organização"
+                    : "todos os registros de acesso"}
+                  . Não afeta contas nem dados de ninguém. Não tem volta.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>

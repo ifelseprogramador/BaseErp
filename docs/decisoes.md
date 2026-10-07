@@ -1162,3 +1162,11 @@ mexer só neles (ex.: status da cobrança) não avisava. Agora guardamos o conte
 contar como alteração. Campo sem `name` não entra no `FormData`; para ele o evento `input` ainda
 marca como alterado. Verificado num Chromium real (Playwright) com o formulário de cobrança:
 texto, Select e digitação pelo controle remoto abrem a pergunta, e o espelho (rrweb) a reproduz.
+
+## 2026-10-07 — Histórico de acessos também por organização
+
+O mesmo `LoginHistoryCard` aparece na ficha de cada organização (`organizationId`) além do geral em
+`/admin`. O filtro é pelas PESSOAS que são membros da organização hoje (`user_id` em
+`memberships`), sem coluna nova: uma pessoa em duas organizações aparece nas duas, e quem saiu da
+equipe deixa de aparecer na ficha (continua no geral). "Limpar tudo" na ficha apaga só os acessos
+dessas pessoas — o que também some do geral, pois é o mesmo registro.

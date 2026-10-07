@@ -5,7 +5,7 @@ const deleteLoginEvent = vi.fn().mockResolvedValue({ ok: true });
 const clearLoginEvents = vi.fn().mockResolvedValue({ ok: true });
 vi.mock("../actions", () => ({
   deleteLoginEvent: (...a: unknown[]) => deleteLoginEvent(...a),
-  clearLoginEvents: () => clearLoginEvents(),
+  clearLoginEvents: (...a: unknown[]) => clearLoginEvents(...a),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 function open() {
-  fireEvent.click(screen.getByRole("button", { name: "Histórico de acessos" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Histórico de acessos/ }));
 }
 
 describe("LoginHistoryCard", () => {
@@ -81,8 +81,18 @@ describe("LoginHistoryCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Limpar tudo" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Limpar tudo" }).at(-1)!);
 
-    await waitFor(() => expect(clearLoginEvents).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(clearLoginEvents).toHaveBeenCalledWith(undefined));
     expect(screen.getByText("Nenhum acesso registrado ainda.")).toBeTruthy();
+  });
+
+  it("na ficha da organização, limpar apaga só os acessos dela", async () => {
+    render(<LoginHistoryCard entries={[entry({})]} organizationId="org-1" />);
+    open();
+
+    fireEvent.click(screen.getByRole("button", { name: "Limpar tudo" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Limpar tudo" }).at(-1)!);
+
+    await waitFor(() => expect(clearLoginEvents).toHaveBeenCalledWith("org-1"));
   });
 
   it("formata a hora no fuso de Brasília", () => {

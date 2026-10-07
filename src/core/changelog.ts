@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.14.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: "O histórico de acessos agora também aparece na ficha de cada organização (só os acessos das pessoas dela, com apagar um ou todos), além do histórico geral no painel do dono.",
+      },
+    ],
+  },
+  {
     version: "0.13.1",
     date: "2026-10-07",
     changes: [

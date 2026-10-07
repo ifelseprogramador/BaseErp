@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq, ilike } from "drizzle-orm";
+import { desc, eq, ilike, inArray } from "drizzle-orm";
 
 import type { Database } from "@/core/db";
 import { getAuditLogForOrg } from "@/core/admin/audit";
@@ -72,7 +72,28 @@ export async function getOrganizationForAdmin(db: Database, organizationId: stri
   };
 }
 
-/** Últimos acessos (logins) de toda a plataforma, do mais recente ao mais antigo. */
-export async function listLoginEvents(db: Database, limit = 200) {
-  return db.select().from(loginEvents).orderBy(desc(loginEvents.createdAt)).limit(limit);
+/**
+ * Últimos acessos (logins), do mais recente ao mais antigo. Com `organizationId`,
+ * só de quem é membro dessa organização (o histórico guarda a pessoa, não a
+ * organização: quem saiu da equipe deixa de aparecer na ficha dela).
+ */
+export async function listLoginEvents(
+  db: Database,
+  options: { organizationId?: string; limit?: number } = {},
+) {
+  const { organizationId, limit = 200 } = options;
+  return db
+    .select()
+    .from(loginEvents)
+    .where(organizationId ? inArray(loginEvents.userId, membersOf(db, organizationId)) : undefined)
+    .orderBy(desc(loginEvents.createdAt))
+    .limit(limit);
+}
+
+/** Subconsulta: ids das pessoas que são membros da organização. */
+export function membersOf(db: Pick<Database, "select">, organizationId: string) {
+  return db
+    .select({ id: memberships.userId })
+    .from(memberships)
+    .where(eq(memberships.organizationId, organizationId));
 }
