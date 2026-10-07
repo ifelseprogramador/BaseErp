@@ -965,3 +965,42 @@ rota se autentica por conta própria (`CRON_SECRET`, segredo do Telegram).
 Migrations: drizzle `0008_support_telegram_chat`, custom
 `0012_support_telegram_chat`. Validado num Postgres em memória (17 cenários) e 54
 testes (regras puras do Telegram, rota do webhook, proxy, painel).
+
+## 2026-10-07 — Teste real do Telegram: webhook velho, túnel e botões do dono
+
+**O que o teste real mostrou** (dados do ngrok, do Telegram e do banco):
+
+1. **Resposta pelo Telegram sem efeito.** O bot estava registrado com
+   `https://abc123.ngrok-free.app` (o valor de EXEMPLO do roteiro) — o Telegram
+   recebia 404 e a resposta ficou pendente (`pending_update_count = 1`). O clique em
+   "Ativar" aconteceu com o servidor ainda usando o `NEXT_PUBLIC_SITE_URL` antigo.
+   Registrado o endereço certo (sem descartar a pendente), a resposta foi processada
+   (a sessão virou `chat` e a mensagem foi gravada): a ponte funcionava, faltava o
+   registro. Correção estrutural: o card do `/admin` agora CONFERE sozinho ao abrir
+   e destaca em vermelho quando o bot aponta para outro endereço.
+2. **Botões que não respondiam no celular, aberto pelo túnel.** O Next 16 bloqueia em
+   desenvolvimento as requisições a recursos internos (HMR/overlay) vindas de
+   qualquer endereço que não seja localhost (`allowedDevOrigins`); pelo ngrok a
+   página carregava mas o JavaScript não assumia — só passaram ações de formulário
+   nativo (login/sair, que funcionam sem JS), nenhuma ação de botão. `next.config.ts`
+   agora libera os domínios de túnel (`*.ngrok-free.dev`, `*.ngrok-free.app`,
+   `*.ngrok.app`, `*.ngrok.dev`, `*.trycloudflare.com`). Só desenvolvimento.
+
+**Novos controles do dono** (lista de pedidos em `/admin`):
+
+- "Enviar mensagem": escreve à pessoa SEM pedir a tela. O pedido (sem atendimento ou
+  esperando) vira conversa por texto — o mesmo caminho do Telegram, agora em
+  `chat-service.ts` (um só código para os dois: abre a conversa, grava, avisa).
+- "Encerrar": descarta um pedido que não precisa mais (usa `endLiveSession`), com
+  confirmação.
+- "Cancelar pedido de tela" (no viewer, em conversa por texto): fecha o aviso de
+  permissão na tela da pessoa e a conversa segue.
+
+**Aviso de mensagem da pessoa:** `sendSupportMessage` publica `chat-message` no canal
+do painel (toast, som e título da aba em QUALQUER página do `/admin`) e só encaminha
+ao Telegram se nenhum admin está online — evita avisar duas vezes quem já está olhando
+o painel, e garante que quem saiu do painel receba no celular.
+
+Sem migration nova. Testes novos: serviço de mensagem do dono, caixa de entrada e o
+widget do usuário (abre a conversa quando o suporte responde, aviso de tela, recusar
+sem fechar, aprovar na mesma sessão, aviso "offline" que sai quando a resposta chega).

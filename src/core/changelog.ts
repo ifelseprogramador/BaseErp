@@ -24,6 +24,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: 'Na lista de pedidos de suporte, o responsável agora pode "Enviar mensagem" para a pessoa sem pedir a tela (a conversa abre na caixa dela), e "Encerrar" um pedido que não precisa mais.',
+      },
+      {
+        type: "novo",
+        text: 'Numa conversa por texto, dá para "Cancelar pedido de tela" se o responsável desistir de ver a tela da pessoa.',
+      },
+      {
+        type: "melhoria",
+        text: "Quando a pessoa escreve na conversa, o responsável é avisado em qualquer página do painel (som e aviso); o Telegram só é usado quando ele não está com o painel aberto.",
+      },
+      {
+        type: "melhoria",
+        text: "O painel confere sozinho se as respostas pelo Telegram estão apontando para o endereço certo e avisa quando não estão.",
+      },
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-10-07",
     changes: [

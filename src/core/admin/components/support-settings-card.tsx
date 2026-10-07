@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,17 @@ export function SupportSettingsCard({
   const [isRegistering, startRegistering] = useTransition();
   const [isChecking, startChecking] = useTransition();
   const [status, setStatus] = useState<TelegramWebhookStatus | null>(null);
+
+  // Confere sozinho ao abrir: o caso comum de erro é o bot apontar para um
+  // endereço antigo (túnel que mudou, domínio trocado) e as respostas se
+  // perderem em silêncio. Adiado (não síncrono) para não re-renderizar em cascata.
+  useEffect(() => {
+    if (!telegramConfigured) return;
+    const timer = setTimeout(() => {
+      startChecking(async () => setStatus(await getTelegramWebhookStatus()));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [telegramConfigured]);
 
   function handleTest() {
     startTesting(async () => {
@@ -116,7 +127,9 @@ export function SupportSettingsCard({
             className={
               status.ok && status.matchesThisSite
                 ? "text-xs text-emerald-600"
-                : "text-muted-foreground text-xs"
+                : status.ok && status.url
+                  ? "text-destructive text-xs"
+                  : "text-muted-foreground text-xs"
             }
           >
             {!status.ok

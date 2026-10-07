@@ -93,7 +93,9 @@ export function LiveSupportWidget({
         });
       })
       .on("broadcast", { event: "chat-open" }, ({ payload }) => {
-        // O suporte respondeu pelo Telegram: abre a caixa de conversa.
+        // O suporte respondeu pelo Telegram: abre a caixa de conversa e tira o
+        // aviso de "suporte offline" (a resposta que ele prometia chegou).
+        setNotice(null);
         setSession((prev) =>
           prev
             ? prev

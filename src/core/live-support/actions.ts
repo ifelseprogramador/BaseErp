@@ -21,6 +21,7 @@ import {
   sendTelegramMessageDetailed,
   setTelegramWebhook,
 } from "@/core/telegram";
+import { announceAdminChatMessage, postAdminChatMessage } from "./chat-service";
 import { announceScreenStarted, forwardUserMessage, sendToOwner } from "./telegram-bridge";
 import type { ActionResult } from "@/core/action-result";
 import {
@@ -876,24 +877,40 @@ export async function sendSupportMessage(
   // adiciona direto do payload (pequeno), sem reler tudo.
   await broadcast(liveSessionChannelName(sessionId), "message", message);
 
-  // Conversa só por texto (veio do Telegram): o que a PESSOA escreve chega ao
-  // Telegram do dono. Com a tela compartilhada (`active`) a conversa já é no
-  // painel e nada vai ao Telegram.
+  // Conversa só por texto: o que a PESSOA escreve precisa chegar ao dono. Se ele
+  // está com o painel aberto, o aviso aparece lá (sino, som, caixa de entrada);
+  // se não está, vai para o Telegram dele. Com a tela compartilhada (`active`) a
+  // conversa já é no painel e nada disso se aplica.
   if (outcome.status === "chat" && outcome.role === "user") {
-    const org = await runWithUserContext(user.id, async (db) => {
-      const [row] = await db
+    const context = await runWithUserContext(user.id, async (db) => {
+      const [org] = await db
         .select({ name: organizations.name })
         .from(organizations)
         .where(eq(organizations.id, outcome.organizationId))
         .limit(1);
-      return row;
+      return {
+        organizationName: org?.name ?? "Organização",
+        adminOnline: await isAnyAdminOnline(db),
+      };
     });
-    await forwardUserMessage({
+    const userName =
+      (user.user_metadata?.display_name as string | undefined) ?? user.email ?? "Usuário";
+
+    await broadcast(adminSupportInboxChannelName(), "chat-message", {
       sessionId,
-      userName: (user.user_metadata?.display_name as string | undefined) ?? user.email ?? "Usuário",
-      organizationName: org?.name ?? "Organização",
-      body: message.body,
+      organizationId: outcome.organizationId,
+      organizationName: context.organizationName,
+      userName,
+      preview: message.body.slice(0, 120),
     });
+    if (!context.adminOnline) {
+      await forwardUserMessage({
+        sessionId,
+        userName,
+        organizationName: context.organizationName,
+        body: message.body,
+      });
+    }
   }
   return { ok: true, chatMessage: message };
 }
@@ -1055,4 +1072,100 @@ export async function getTelegramWebhookStatus(): Promise<TelegramWebhookStatus>
     lastErrorMessage: result.info.lastErrorMessage,
     matchesThisSite: Boolean(origin) && result.info.url === `${origin}/api/telegram/webhook`,
   };
+}
+
+/**
+ * O dono escreve para a pessoa direto do painel, SEM pedir a tela: o pedido
+ * (sem atendimento ou ainda esperando) vira uma conversa por texto e a caixa
+ * dela abre com a mensagem — a mesma coisa que acontece quando ele responde pelo
+ * Telegram. A conversa segue no painel (ficha da empresa) e, se ele sair do
+ * painel, o que a pessoa escrever chega ao Telegram.
+ */
+export async function sendAdminMessage(
+  sessionId: string,
+  rawBody: string,
+): Promise<ActionResult & { chatMessage?: ChatMessageDto }> {
+  const { userId, log, withDb } = await requireAdmin();
+  const body = normalizeChatMessage(rawBody);
+  if (!body) return { ok: false, message: "Escreva uma mensagem." };
+
+  const outcome = await withDb(async (db) => {
+    await expireStalePendingSessions(db);
+    const [session] = await db
+      .select()
+      .from(liveSessions)
+      .where(eq(liveSessions.id, sessionId))
+      .limit(1);
+    if (!session || !session.subjectUserId) return null;
+    const eligible =
+      session.status === "missed" ||
+      session.status === "chat" ||
+      (session.status === "pending" && session.initiatedBy === "user");
+    if (!eligible) return null;
+    const result = await postAdminChatMessage(db, {
+      session: {
+        id: session.id,
+        organizationId: session.organizationId,
+        status: session.status,
+        subjectUserId: session.subjectUserId,
+      },
+      adminId: userId,
+      body,
+      auditAction: "live_support.conversa_painel",
+    });
+    return {
+      ...result,
+      subjectUserId: session.subjectUserId,
+      organizationId: session.organizationId,
+    };
+  });
+
+  if (!outcome) {
+    return { ok: false, message: "Esse pedido não está mais aberto para conversa." };
+  }
+
+  await announceAdminChatMessage({
+    sessionId,
+    subjectUserId: outcome.subjectUserId,
+    row: outcome.row,
+    opened: outcome.opened,
+  });
+  log.info("live_support.mensagem_painel", { sessionId, opened: outcome.opened });
+  revalidatePath("/admin");
+  revalidatePath(`/admin/organizacoes/${outcome.organizationId}`);
+  return { ok: true, chatMessage: toDto(outcome.row) };
+}
+
+/** O dono desiste de ver a tela (numa conversa por texto): fecha o aviso na tela da pessoa. */
+export async function cancelScreenRequest(sessionId: string): Promise<ActionResult> {
+  const { userId, log, withDb } = await requireAdmin();
+
+  const organizationId = await withDb(async (db) => {
+    const [session] = await db
+      .select()
+      .from(liveSessions)
+      .where(eq(liveSessions.id, sessionId))
+      .limit(1);
+    if (!session || session.status !== "chat" || !session.screenRequested) return null;
+
+    await db
+      .update(liveSessions)
+      .set({ screenRequested: false })
+      .where(eq(liveSessions.id, sessionId));
+    await recordAudit(db, {
+      actorUserId: userId,
+      organizationId: session.organizationId,
+      action: "live_support.cancelar_pedido_de_tela",
+    });
+    return session.organizationId;
+  });
+  if (!organizationId) {
+    return { ok: false, message: "Não há pedido de tela em aberto nesta conversa." };
+  }
+
+  log.info("live_support.cancelar_pedido_de_tela", { sessionId });
+  // Mesmo evento da recusa: a caixa da pessoa fecha o aviso e a conversa segue.
+  await broadcast(liveSessionChannelName(sessionId), "status", { status: "chat" });
+  revalidatePath(`/admin/organizacoes/${organizationId}`);
+  return { ok: true };
 }

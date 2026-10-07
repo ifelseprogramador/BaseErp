@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logger } from "@/core/logger";
+import { flashTabTitle, playChatSound } from "@/core/live-support/chat-sound";
 import { adminSupportInboxChannelName, getRealtimeChannel } from "@/core/live-support/realtime";
 import { acceptSupportRequest, requestAccessToSession } from "@/core/live-support/actions";
 import { itemFromBroadcast, upsertRequest, type SupportRequestItem } from "./support-requests";
@@ -47,6 +48,21 @@ export function SupportNotificationBell({
       .on("broadcast", { event: "missed" }, ({ payload }) => {
         const item = itemFromBroadcast(payload, "missed");
         setRequests((prev) => upsertRequest(prev, item));
+      })
+      .on("broadcast", { event: "chat-message" }, ({ payload }) => {
+        // A pessoa escreveu numa conversa por texto — avisa em qualquer página do
+        // painel (som + aviso), já que o dono pode estar em outra tela.
+        const item = itemFromBroadcast(payload, "chat");
+        setRequests((prev) => upsertRequest(prev, item));
+        playChatSound();
+        flashTabTitle("💬 Nova mensagem — suporte");
+        toast.info(`${item.userName} (${item.organizationName})`, {
+          description: (payload.preview as string | undefined) ?? "Nova mensagem",
+          action: {
+            label: "Abrir conversa",
+            onClick: () => window.location.assign(`/admin/organizacoes/${item.organizationId}`),
+          },
+        });
       })
       .subscribe((subscribeStatus, err) => {
         if (subscribeStatus === "CHANNEL_ERROR" || subscribeStatus === "TIMED_OUT") {

@@ -1,19 +1,14 @@
 import "server-only";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { runWithSystemContext, runWithUserContext, type Database } from "@/core/db";
-import {
-  liveSessionMessages,
-  liveSessions,
-  organizations,
-  platformAdmins,
-  supportTelegramMessages,
-} from "@/db/schema";
+import { liveSessions, organizations, platformAdmins, supportTelegramMessages } from "@/db/schema";
 import { recordAudit } from "@/core/admin/audit";
 import { logger } from "@/core/logger";
 import { sendBroadcast as broadcast } from "@/core/supabase/realtime-sender";
 import { sendTelegramMessageDetailed } from "@/core/telegram";
 import { getUserDisplayInfoByIds } from "@/core/user-lookup";
-import { liveSessionChannelName, userSupportChannelName } from "./realtime";
+import { announceAdminChatMessage, postAdminChatMessage } from "./chat-service";
+import { liveSessionChannelName } from "./realtime";
 import {
   formatConversationOpened,
   formatForwardedMessage,
@@ -235,41 +230,27 @@ export async function handleOwnerMessage(inbound: TelegramInbound): Promise<void
     if (!body) return;
 
     const opened = plan === "open_and_message";
-    const message = await runWithUserContext(adminId, async (db) => {
-      if (opened) {
-        await db
-          .update(liveSessions)
-          .set({ status: "chat", adminUserId: adminId, expiresAt: null })
-          .where(eq(liveSessions.id, session.id));
-        await recordAudit(db, {
-          actorUserId: adminId,
+    const { row: message } = await runWithUserContext(adminId, (db) =>
+      postAdminChatMessage(db, {
+        session: {
+          id: session.id,
           organizationId: session.organizationId,
-          action: "live_support.conversa_telegram",
-        });
-      }
-      const [row] = await db
-        .insert(liveSessionMessages)
-        .values({
-          sessionId: session.id,
-          organizationId: session.organizationId,
-          senderUserId: adminId,
-          senderRole: "admin",
-          body,
-        })
-        .returning();
-      return row;
-    });
+          status: session.status,
+          subjectUserId: subjectId,
+        },
+        adminId,
+        body,
+        auditAction: "live_support.conversa_telegram",
+      }),
+    );
 
     // Quem está com o app aberto passa a ver a caixa de conversa agora; quem
     // não está, vê ao entrar (a sessão `chat` volta no carregamento do app).
-    if (opened) {
-      await broadcast(userSupportChannelName(subjectId), "chat-open", { sessionId: session.id });
-    }
-    await broadcast(liveSessionChannelName(session.id), "message", {
-      id: message.id,
-      role: "admin",
-      body: message.body,
-      createdAt: message.createdAt.toISOString(),
+    await announceAdminChatMessage({
+      sessionId: session.id,
+      subjectUserId: subjectId,
+      row: message,
+      opened,
     });
 
     if (opened) {

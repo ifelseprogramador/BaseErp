@@ -8,6 +8,18 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // Só em DESENVOLVIMENTO: o Next bloqueia por padrão requisições aos recursos
+  // internos do dev server (HMR, overlay) vindas de qualquer endereço que não
+  // seja localhost — com o app aberto por um túnel (ngrok, Cloudflare), a
+  // página carrega mas o JavaScript não assume e os botões não respondem.
+  // Estes são os endereços de túnel mais comuns; não tem efeito em produção.
+  allowedDevOrigins: [
+    "*.ngrok-free.dev",
+    "*.ngrok-free.app",
+    "*.ngrok.app",
+    "*.ngrok.dev",
+    "*.trycloudflare.com",
+  ],
 };
 
 export default nextConfig;

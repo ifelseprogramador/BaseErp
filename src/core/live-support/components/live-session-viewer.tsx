@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { logger } from "@/core/logger";
 import { getRealtimeChannel, liveSessionChannelName } from "../realtime";
 import {
+  cancelScreenRequest,
   endLiveSession,
   getFullSnapshot,
   requestAccessToSession,
@@ -479,6 +480,18 @@ export function LiveSessionViewer({
     });
   }
 
+  function handleCancelScreenRequest() {
+    startTransition(async () => {
+      const result = await cancelScreenRequest(sessionId);
+      if (result.ok) {
+        setScreenRequested(false);
+        toast.success("Pedido de tela cancelado. A conversa segue normalmente.");
+      } else {
+        toast.error(result.message ?? "Não foi possível cancelar o pedido.");
+      }
+    });
+  }
+
   function handleEnd() {
     startTransition(async () => {
       await endLiveSession(sessionId);
@@ -560,9 +573,23 @@ export function LiveSessionViewer({
             Pedir acesso à tela
           </Button>
         )}
+        {status === "chat" && screenRequested && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCancelScreenRequest}
+            disabled={isPending}
+          >
+            Cancelar pedido de tela
+          </Button>
+        )}
         <Button variant="destructive" size="sm" onClick={handleEnd} disabled={isPending}>
           <X className="h-4 w-4" />
-          {status === "chat" ? "Encerrar conversa" : "Encerrar sessão"}
+          {status === "chat"
+            ? "Encerrar conversa"
+            : status === "pending"
+              ? "Cancelar pedido"
+              : "Encerrar sessão"}
         </Button>
       </div>
 
