@@ -42,7 +42,7 @@ export function OrgSupportWaitForm({
   }
 
   return (
-    <form onSubmit={handleSave} className="flex flex-col gap-3">
+    <form data-unsaved-guard onSubmit={handleSave} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="orgSupportWait">Espera por atendimento (segundos)</Label>

@@ -1123,3 +1123,16 @@ o que foi digitado nos formulários nem derrubar a conexão do suporte ao vivo. 
 vivo" abre sozinho se já há pedido/conversa/tela em andamento (`defaultOpen`); as ações do cabeçalho
 (ex.: "Limpar tudo" do histórico) só aparecem com o cartão aberto. A caixa de pedidos de suporte
 (`SupportInbox`) NÃO é recolhível: é um alerta e precisa ficar à vista.
+
+## 2026-10-07 — Aviso de alterações não salvas
+
+`UnsavedChangesGuard` (`components/unsaved-changes-guard.tsx`, montado nos layouts do app e do
+admin) vigia todo `<form data-unsaved-guard>`: um `input`/`change` o deixa "sujo" até o `submit`.
+Enquanto houver um sujo: clique em link interno (captura no `document`, antes do React/Next Link)
+e o `BackButton` (via `guardNavigation`) abrem a pergunta Continuar editando / Descartar e sair /
+Salvar; `beforeunload` cobre fechar a aba e recarregar. É por atributo (opt-in) de propósito:
+login, troca de senha, busca, chat e diálogos NÃO são vigiados. "Salvar" faz `requestSubmit()` e
+FICA na tela — se o servidor recusar um campo, a pessoa vê o erro em vez de perder o que digitou
+ao navegar. Limites: o botão Voltar do navegador/celular (popstate) não é interceptado; depois de um
+envio com erro de validação o formulário só volta a ser vigiado quando a pessoa mexer de novo.
+Formulário novo de cadastro/edição → acrescentar `data-unsaved-guard`.

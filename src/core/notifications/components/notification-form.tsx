@@ -46,7 +46,7 @@ export function NotificationForm({
   }, [state]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form data-unsaved-guard action={formAction} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="title">Título</Label>
         <Input id="title" name="title" defaultValue={notification?.title} required />

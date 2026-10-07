@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { guardNavigation } from "@/components/unsaved-changes-guard";
 
 /**
  * Seta pra voltar pra onde a pessoa veio (`router.back()` — histórico de
@@ -26,7 +27,7 @@ export function BackButton({ href }: { href?: string }) {
       aria-label="Voltar"
       {...(href
         ? { nativeButton: false, render: <Link href={href} /> }
-        : { onClick: () => router.back() })}
+        : { onClick: () => void (guardNavigation(() => router.back()) || router.back()) })}
     >
       <ArrowLeft className="h-4 w-4" />
     </Button>

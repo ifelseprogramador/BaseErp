@@ -41,6 +41,7 @@ export function SeatsForm({
 
   return (
     <form
+      data-unsaved-guard
       key={`${multiUser}-${seatLimit}-${extraSeatPriceCents}`}
       action={formAction}
       className="flex flex-col gap-4"

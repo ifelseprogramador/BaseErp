@@ -72,7 +72,7 @@ export function CompanyForm({ initial }: { initial: CompanyProfile }) {
   );
 
   return (
-    <form action={formAction} className="grid gap-4 sm:grid-cols-2">
+    <form data-unsaved-guard action={formAction} className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
         {field("displayName", "Nome nos documentos", {
           placeholder: initial.accountName,

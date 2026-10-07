@@ -80,6 +80,8 @@ FOUNDATION_PATHS=(
   "src/core/admin/components/admin-presence-beacon.tsx"
   "src/core/admin/components/support-settings-card.tsx"
   "src/core/admin/components/collapsible-card.tsx"
+  "src/components/unsaved-changes-guard.tsx"
+  "src/components/__tests__/unsaved-changes-guard.test.tsx"
   "src/core/admin/__tests__/collapsible-card.test.tsx"
   "src/core/status-history.ts"
   "src/components/audit-stamp.tsx"

@@ -44,6 +44,7 @@ export function BillingForm({
     // Remonta com dado fresco depois de salvar, para o Select não avisar
     // de defaultValue mudando após montado.
     <form
+      data-unsaved-guard
       key={`${billingStatus}-${nextDueDate}-${billingNotes}`}
       action={formAction}
       className="flex flex-col gap-4"

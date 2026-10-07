@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.12.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "novo",
+        text: "Ao sair de uma tela com alterações não salvas (clicando no menu, em um link ou no botão Voltar), o sistema pergunta se você quer continuar editando, descartar e sair ou salvar. Fechar a aba ou recarregar também avisa.",
+      },
+    ],
+  },
+  {
     version: "0.11.0",
     date: "2026-10-07",
     changes: [

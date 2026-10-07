@@ -63,7 +63,7 @@ export function EmailSettingsForm({ summary }: { summary: EmailSettingsSummary |
   );
 
   return (
-    <form action={formAction} className="grid gap-4 sm:grid-cols-2">
+    <form data-unsaved-guard action={formAction} className="grid gap-4 sm:grid-cols-2">
       {field(
         "host",
         "Servidor SMTP",

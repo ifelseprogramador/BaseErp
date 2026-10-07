@@ -22,6 +22,7 @@ import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { VersionBadge } from "@/components/version-badge";
 import { OrgBrandingStyle } from "@/components/org-branding-style";
+import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard";
 import { BrandIcon } from "@/components/brand-icon";
 import { BRAND } from "@/core/brand";
 import { Button } from "@/components/ui/button";
@@ -169,6 +170,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
+      <UnsavedChangesGuard />
       {!org.impersonating && (
         <LiveSupportWidget
           userId={org.userId}

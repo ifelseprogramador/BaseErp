@@ -200,7 +200,7 @@ export function BrandingForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form data-unsaved-guard action={formAction} className="flex flex-col gap-4">
       <ColorPickerField
         name="primaryColor"
         label="Cor de destaque (botões)"
