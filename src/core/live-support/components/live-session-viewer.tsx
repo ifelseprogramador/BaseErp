@@ -498,96 +498,106 @@ export function LiveSessionViewer({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <Badge variant={status === "active" ? "secondary" : "outline"}>
-          {status === "active"
-            ? "Ao vivo"
-            : status === "chat"
-              ? screenRequested
-                ? "Conversa por texto — aguardando a pessoa liberar a tela..."
-                : "Conversa por texto"
-              : "Aguardando aprovação da pessoa..."}
-        </Badge>
-        {controlGranted && <Badge>Controle remoto concedido</Badge>}
-        {connectionError && (
-          <Badge variant="destructive">Erro de conexão em tempo real — recarregue a página</Badge>
-        )}
-        {status === "active" && hasFrame && (
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              title="Diminuir zoom"
-              onClick={() => setZoom((z) => Math.max(0.25, z - 0.1))}
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <span className="text-muted-foreground w-12 text-center text-xs">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              title="Aumentar zoom"
-              onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              title="Ajustar para caber"
-              onClick={() => {
-                if (naturalSize && containerRef.current) {
-                  setZoom(Math.min(1, containerRef.current.clientWidth / naturalSize.width));
-                }
-              }}
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-        {status === "active" && (
-          <Button
-            variant="outline"
-            size="sm"
-            title="Pede à pessoa um quadro novo da tela, se o espelho parecer travado ou desatualizado"
-            onClick={() =>
-              void channelRef.current?.send({
-                type: "broadcast",
-                event: "request-snapshot",
-                payload: {},
-              })
-            }
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Badge
+            variant={status === "active" ? "secondary" : "outline"}
+            className="h-auto max-w-full py-0.5 whitespace-normal"
           >
-            <RefreshCw className="h-4 w-4" />
-            Atualizar tela
+            {status === "active"
+              ? "Ao vivo"
+              : status === "chat"
+                ? screenRequested
+                  ? "Conversa por texto — aguardando a pessoa liberar a tela..."
+                  : "Conversa por texto"
+                : "Aguardando aprovação da pessoa..."}
+          </Badge>
+          {controlGranted && <Badge>Controle remoto concedido</Badge>}
+          {connectionError && (
+            <Badge variant="destructive" className="h-auto max-w-full py-0.5 whitespace-normal">
+              Erro de conexão em tempo real — recarregue a página
+            </Badge>
+          )}
+        </div>
+        {/* No celular os controles quebram de linha em vez de estourar a tela. */}
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {status === "active" && hasFrame && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Diminuir zoom"
+                onClick={() => setZoom((z) => Math.max(0.25, z - 0.1))}
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="text-muted-foreground w-12 text-center text-xs">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Aumentar zoom"
+                onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Ajustar para caber"
+                onClick={() => {
+                  if (naturalSize && containerRef.current) {
+                    setZoom(Math.min(1, containerRef.current.clientWidth / naturalSize.width));
+                  }
+                }}
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {status === "active" && (
+            <Button
+              variant="outline"
+              size="sm"
+              title="Pede à pessoa um quadro novo da tela, se o espelho parecer travado ou desatualizado"
+              onClick={() =>
+                void channelRef.current?.send({
+                  type: "broadcast",
+                  event: "request-snapshot",
+                  payload: {},
+                })
+              }
+            >
+              <RefreshCw className="h-4 w-4" />
+              Atualizar tela
+            </Button>
+          )}
+          {status === "chat" && !screenRequested && (
+            <Button variant="outline" size="sm" onClick={handleRequestScreen} disabled={isPending}>
+              <Monitor className="h-4 w-4" />
+              Pedir acesso à tela
+            </Button>
+          )}
+          {status === "chat" && screenRequested && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancelScreenRequest}
+              disabled={isPending}
+            >
+              Cancelar pedido de tela
+            </Button>
+          )}
+          <Button variant="destructive" size="sm" onClick={handleEnd} disabled={isPending}>
+            <X className="h-4 w-4" />
+            {status === "chat"
+              ? "Encerrar conversa"
+              : status === "pending"
+                ? "Cancelar pedido"
+                : "Encerrar sessão"}
           </Button>
-        )}
-        {status === "chat" && !screenRequested && (
-          <Button variant="outline" size="sm" onClick={handleRequestScreen} disabled={isPending}>
-            <Monitor className="h-4 w-4" />
-            Pedir acesso à tela
-          </Button>
-        )}
-        {status === "chat" && screenRequested && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCancelScreenRequest}
-            disabled={isPending}
-          >
-            Cancelar pedido de tela
-          </Button>
-        )}
-        <Button variant="destructive" size="sm" onClick={handleEnd} disabled={isPending}>
-          <X className="h-4 w-4" />
-          {status === "chat"
-            ? "Encerrar conversa"
-            : status === "pending"
-              ? "Cancelar pedido"
-              : "Encerrar sessão"}
-        </Button>
+        </div>
       </div>
 
       {/* pointer-events-none no iframe: um iframe é um contexto de

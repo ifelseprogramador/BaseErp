@@ -176,3 +176,18 @@ describe("SupportChatPanel — encerrar conversa por texto", () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("SupportChatPanel — cabeçalho em tela estreita", () => {
+  it("o título encolhe e os botões do cabeçalho nunca são empurrados para fora", () => {
+    render(<SupportChatPanel sessionId={SESSION} side="user" onEnd={() => {}} />);
+
+    const title = screen.getByText("Conversa com o suporte");
+    expect(title.className).toContain("truncate");
+
+    for (const name of ["Silenciar aviso sonoro", "Encerrar conversa", "Recolher conversa"]) {
+      const button = screen.getByRole("button", { name });
+      // Todos no mesmo grupo, que não encolhe.
+      expect(button.parentElement?.className).toContain("shrink-0");
+    }
+  });
+});

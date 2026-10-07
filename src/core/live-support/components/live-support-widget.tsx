@@ -364,7 +364,7 @@ export function LiveSupportWidget({
       {notice && (
         <div
           role="status"
-          className="bg-card fixed right-4 bottom-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border p-3 text-sm shadow-lg"
+          className="bg-card fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border p-3 text-sm shadow-lg sm:max-w-sm"
         >
           <WifiOff className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
           <span>{notice}</span>
@@ -427,7 +427,7 @@ export function LiveSupportWidget({
       </Dialog>
 
       {session?.status === "pending" && session.initiatedBy === "user" && (
-        <div className="bg-card fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-lg border p-3 text-sm shadow-lg">
+        <div className="bg-card fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-wrap items-center gap-3 rounded-lg border p-3 text-sm shadow-lg">
           <span>
             Aguardando atendimento do suporte...
             {secondsLeft !== null && (
@@ -441,9 +441,9 @@ export function LiveSupportWidget({
       )}
 
       {session?.status === "active" && (
-        <div className="flex items-center justify-between gap-4 bg-blue-600 px-4 py-2 text-sm font-medium text-white">
-          <span className="flex items-center gap-2">
-            <Headset className="h-4 w-4" />
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-blue-600 px-3 py-2 text-sm font-medium text-white sm:px-4">
+          <span className="flex min-w-0 flex-1 basis-48 items-center gap-2">
+            <Headset className="h-4 w-4 shrink-0" />
             Sessão de suporte ativa — sua tela está sendo acompanhada ao vivo
           </span>
           {/* Controles num "pill" claro em vez de cor forçada em cima do
@@ -454,7 +454,7 @@ export function LiveSupportWidget({
               destaque nenhum sobre a barra — e "Encerrar" com o estilo
               destrutivo (fundo vermelho suave), pra se destacar como uma
               ação diferente do toggle, não só mais um botão neutro. */}
-          <div className="flex shrink-0 items-center gap-3 rounded-full bg-blue-50 px-3 py-1 shadow-sm">
+          <div className="flex shrink-0 flex-wrap items-center gap-3 rounded-full bg-blue-50 px-3 py-1 shadow-sm">
             <label className="flex items-center gap-2 text-xs font-medium text-zinc-700">
               Controle remoto
               <Switch

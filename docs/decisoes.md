@@ -1038,3 +1038,20 @@ gesto de arrastar rola o espelho localmente, não a página dela.
 **Aviso de hidratação:** `<body suppressHydrationWarning>` nos três layouts — extensões
 (ColorZilla injeta `cz-shortcut-listen`, gerenciadores de senha, tradutores) mudam o
 `<body>` antes de o React assumir e geravam um erro de console que não é bug do sistema.
+
+## 2026-10-07 — Suporte ao vivo em celular em pé: controles que estouravam a tela
+
+Em largura estreita (celular em pé) vários controles do suporte ficavam fora da tela:
+a barra do viewer do dono (selo de estado + zoom + "Atualizar tela" + "Encerrar") era
+uma linha única sem quebra; a barra "Sessão de suporte ativa" da pessoa tinha o texto
+longo e o grupo "Controle remoto + Encerrar" (`shrink-0`) na mesma linha; os cartões
+fixos (aviso "suporte offline", espera pelo atendimento) não tinham largura máxima e,
+ancorados à direita, passavam da borda esquerda.
+
+Regra adotada para os controles do suporte: barras com `flex-wrap`; texto longo com
+`min-w-0` (e `basis-*`) para ceder espaço; selos de estado com `whitespace-normal`;
+cartões fixos com `max-w-[calc(100vw-2rem)]`; no cabeçalho da caixa de conversa, o título
+trunca e o grupo de ícones é `shrink-0`. Testes de classe garantem a regra
+(`live-session-viewer.test.tsx`, `live-support-widget.test.tsx`,
+`support-chat-panel.test.tsx`) — é uma checagem de estrutura, não de pixels: a prova
+final é abrir no celular.

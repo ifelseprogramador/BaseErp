@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.2",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "No celular em pé, os botões do suporte ao vivo (como Encerrar) não passam mais da largura da tela: a barra de controles quebra de linha e o texto longo se ajusta.",
+      },
+    ],
+  },
+  {
     version: "0.9.1",
     date: "2026-10-07",
     changes: [

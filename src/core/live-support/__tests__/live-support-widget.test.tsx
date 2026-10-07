@@ -199,3 +199,55 @@ describe("LiveSupportWidget — chamar suporte sem ninguém online", () => {
     expect(screen.queryByText(/não está online no momento/)).toBeNull();
   });
 });
+
+describe("LiveSupportWidget — telas estreitas (celular)", () => {
+  const ACTIVE = {
+    id: "s1",
+    status: "active" as const,
+    initiatedBy: "user" as const,
+    controlGranted: false,
+  };
+
+  it("a barra de sessão ativa quebra de linha e o botão Encerrar continua alcançável", () => {
+    render(<LiveSupportWidget userId="u1" initialSession={ACTIVE} />);
+
+    const end = screen.getByRole("button", { name: /^Encerrar$/ });
+    const banner = end.closest("div.bg-blue-600");
+    expect(banner).toBeTruthy();
+    expect(banner?.className).toContain("flex-wrap");
+    // O texto longo cede espaço (encolhe/quebra) em vez de empurrar os controles para fora.
+    const text = screen.getByText(/Sessão de suporte ativa/);
+    expect(text.className).toContain("min-w-0");
+    expect(text.className).toContain("basis-48");
+  });
+
+  it("os cartões fixos nunca passam da largura da tela", async () => {
+    callForSupport.mockResolvedValue({ ok: true, sessionId: "s9", status: "missed" });
+    const user = userEvent.setup();
+    render(<LiveSupportWidget userId="u1" initialSession={null} />);
+
+    await user.click(screen.getByTitle("Chamar suporte"));
+
+    const notice = (await screen.findByText(/não está online no momento/)).closest("[role=status]");
+    expect(notice?.className).toContain("max-w-[calc(100vw-2rem)]");
+  });
+
+  it("o cartão de espera pelo atendimento quebra de linha e mantém o Cancelar visível", () => {
+    render(
+      <LiveSupportWidget
+        userId="u1"
+        initialSession={{
+          id: "s1",
+          status: "pending",
+          initiatedBy: "user",
+          controlGranted: false,
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        }}
+      />,
+    );
+
+    const cancel = screen.getByRole("button", { name: "Cancelar" });
+    expect(cancel.parentElement?.className).toContain("flex-wrap");
+    expect(cancel.parentElement?.className).toContain("max-w-[calc(100vw-2rem)]");
+  });
+});

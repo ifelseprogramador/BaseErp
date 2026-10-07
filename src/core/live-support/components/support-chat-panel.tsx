@@ -76,9 +76,14 @@ export function SupportChatPanel({
       }
       header={
         <div className="flex items-center justify-between gap-2 text-sm font-medium">
-          <span className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            {side === "user" ? "Conversa com o suporte" : "Conversa com o cliente"}
+          {/* O título encolhe (reticências) e os ícones nunca saem da caixa — em
+              celular em pé, ou com a caixa reduzida, os botões do cabeçalho
+              (som, encerrar, recolher) continuam visíveis. */}
+          <span className="flex min-w-0 items-center gap-2">
+            <MessageSquare className="h-4 w-4 shrink-0" />
+            <span className="truncate">
+              {side === "user" ? "Conversa com o suporte" : "Conversa com o cliente"}
+            </span>
             {unread > 0 && (
               <span
                 className="bg-destructive rounded-full px-1.5 text-[10px] leading-4 font-semibold text-white"
@@ -88,7 +93,7 @@ export function SupportChatPanel({
               </span>
             )}
           </span>
-          <span className="flex items-center gap-0.5">
+          <span className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
               data-no-drag
