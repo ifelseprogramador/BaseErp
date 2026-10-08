@@ -271,7 +271,18 @@ export function LiveSupportWidget({
             void channel.send({ type: "broadcast", event: "rrweb", payload: event });
           },
         });
-        stopRecordingRef.current = stop ?? null;
+        // Avisa o espelho do dono quando a pessoa troca de aba (ele mostra um aviso em
+        // vez de ficar parado/branco) e, ao voltar, manda um quadro novo e inteiro.
+        function handleVisibility() {
+          const visible = document.visibilityState === "visible";
+          void channel.send({ type: "broadcast", event: "visibility", payload: { visible } });
+          if (visible) takeSnapshotRef.current?.();
+        }
+        document.addEventListener("visibilitychange", handleVisibility);
+        stopRecordingRef.current = () => {
+          document.removeEventListener("visibilitychange", handleVisibility);
+          stop?.();
+        };
         takeSnapshotRef.current = () => record.takeFullSnapshot();
         // Segundo quadro completo, depois que a tela assenta. O primeiro sai
         // no instante em que a pessoa clica em "Permitir" — com o próprio
@@ -465,7 +476,7 @@ export function LiveSupportWidget({
                 // ficar sobre fundo branco comum) quase some em cima do
                 // pill azul clarinho daqui — escurecido só nesta
                 // instância.
-                className="data-unchecked:bg-zinc-400"
+                className="data-unchecked:bg-zinc-400 dark:data-unchecked:bg-zinc-400 dark:[&>[data-slot=switch-thumb]]:bg-white!"
               />
             </label>
             <div className="h-4 w-px bg-blue-200" />

@@ -24,6 +24,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.16.0",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "Suporte ao vivo, modo noturno: o interruptor de controle remoto na tarja da sessão e o destaque do campo em foco no espelho agora ficam visíveis.",
+      },
+      {
+        type: "correcao",
+        text: "Espelho do dono: quando a pessoa troca de aba ou minimiza o navegador, o último quadro permanece com um aviso (antes ficava branco) e a tela é renovada quando ela volta.",
+      },
+      {
+        type: "correcao",
+        text: "Espelho no celular: escolher uma opção numa lista suspensa passa a trocar o valor na tela da pessoa (o campo é identificado com exatidão, sem depender de coordenadas).",
+      },
+    ],
+  },
+  {
     version: "0.15.2",
     date: "2026-10-07",
     changes: [

@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { logger } from "@/core/logger";
+import { isDegenerateViewportEvent } from "../replay-events";
 import { getRealtimeChannel, liveSessionChannelName } from "../realtime";
 import {
   cancelScreenRequest,
@@ -112,6 +113,8 @@ export function LiveSessionViewer({
   const [hasFrame, setHasFrame] = useState(false);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const [zoom, setZoom] = useState(1);
+  // A pessoa trocou de aba/minimizou: o espelho mantém o último quadro e avisa.
+  const [personAway, setPersonAway] = useState(false);
   const [isPending, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const replayerRootRef = useRef<HTMLDivElement | null>(null);
@@ -230,7 +233,9 @@ export function LiveSessionViewer({
           // específicas.
           target.style.setProperty("outline", "2px solid #3b82f6", "important");
           target.style.setProperty("outline-offset", "1px", "important");
-          target.style.setProperty("background-color", "#dbeafe", "important");
+          // Azul translúcido (não um azul claro opaco): no modo noturno da pessoa o texto é
+          // claro, e um fundo claro opaco o deixava ilegível.
+          target.style.setProperty("background-color", "rgb(59 130 246 / 0.28)", "important");
           target.style.setProperty(
             "box-shadow",
             "0 0 0 2px #3b82f6, 0 0 0 4px #93c5fd",
@@ -349,8 +354,13 @@ export function LiveSessionViewer({
       .on("broadcast", { event: "resync" }, () => {
         resync();
       })
+      .on("broadcast", { event: "visibility" }, ({ payload }) => {
+        setPersonAway(payload.visible === false);
+      })
       .on("broadcast", { event: "rrweb" }, ({ payload }) => {
         const event = payload as eventWithTime;
+        // Aba da pessoa em segundo plano: tamanho 0 deixaria o espelho branco.
+        if (isDegenerateViewportEvent(event)) return;
         if (!replayerRef.current) {
           pendingEventsRef.current.push(event);
           return;
@@ -443,6 +453,8 @@ export function LiveSessionViewer({
     xFrac: number;
     yFrac: number;
     field: SelectField;
+    /** Id do rrweb do <select> tocado (acha o elemento exato na tela da pessoa). */
+    nodeId?: number;
   } | null>(null);
   const zoomRef = useRef(1);
 
@@ -476,10 +488,12 @@ export function LiveSessionViewer({
     // <select> nativo: a lista dele é desenhada pelo navegador e não vem no
     // espelho, então mostramos uma lista própria e mandamos só a opção escolhida.
     if (controlGrantedRef.current) {
-      const select = readSelectField(elementAtFraction(getIframe(), xFrac, yFrac));
+      const tapped = elementAtFraction(getIframe(), xFrac, yFrac);
+      const select = readSelectField(tapped);
       if (select) {
         typingRef.current?.blur();
-        setSelectPicker({ xFrac, yFrac, field: select });
+        const id = tapped ? replayerRef.current?.getMirror?.().getId(tapped as never) : undefined;
+        setSelectPicker({ xFrac, yFrac, field: select, nodeId: id && id > 0 ? id : undefined });
         return;
       }
     }
@@ -854,6 +868,15 @@ export function LiveSessionViewer({
           style={controlGranted ? { touchAction: "pan-x pan-y" } : undefined}
           className="bg-muted relative h-[75vh] w-full overflow-auto rounded-lg border [&_iframe]:pointer-events-none"
         >
+          {personAway && (
+            <p
+              role="status"
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-amber-500/90 px-3 py-2 text-center text-xs font-medium text-amber-950"
+            >
+              A pessoa está em outra aba ou com o navegador minimizado — a tela volta a atualizar
+              quando ela retornar.
+            </p>
+          )}
           {!hasFrame && !connectionError && (
             <p className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
               Aguardando o primeiro quadro da tela da organização...
@@ -912,6 +935,7 @@ export function LiveSessionViewer({
                     type: "select",
                     xFrac: selectPicker.xFrac,
                     yFrac: selectPicker.yFrac,
+                    nodeId: selectPicker.nodeId,
                     index,
                   });
                   setSelectPicker(null);

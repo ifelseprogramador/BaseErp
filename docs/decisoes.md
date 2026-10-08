@@ -1225,3 +1225,18 @@ texto; a lista aberta é desenhada pelo navegador e, no modo noturno, aparecia b
 Em `globals.css` (`@layer base`): `.dark select { color-scheme: dark }` (o navegador desenha a lista
 escura) e `select option` usa `--popover`/`--popover-foreground`. Vale para todo `<select>` do sistema,
 sem mexer em cada tela.
+
+## 2026-10-07 — Espelho: modo noturno, aba em segundo plano e listas suspensas no celular
+
+1. **Modo noturno.** O destaque do campo em foco no espelho usava um azul claro OPACO (`#dbeafe`): com o
+   texto claro da página noturna da pessoa, ficava ilegível. Agora é azul translúcido
+   (`rgb(59 130 246 / .28)`). O `Switch` da tarja de sessão ativa fica sobre uma "pílula" clara, mas no
+   modo noturno a trilha desligada (`dark:data-unchecked:bg-input/80`) e o polegar (`dark:...bg-foreground`)
+   viravam branco sobre claro; a instância força trilha zinc-400 e polegar branco.
+2. **Aba em segundo plano.** Alguns navegadores informam janela 0×0 com a aba oculta; o rrweb gravava um
+   `Meta`/`ViewportResize` 0×0 e o espelho encolhia para nada (branco). O viewer ignora esses eventos
+   (`core/live-support/replay-events.ts`); a pessoa avisa `visibility` (visível/oculta) e, ao voltar, manda um
+   quadro completo novo (reaproveita o `resync`). Com ela ausente o espelho mostra uma faixa de aviso.
+3. **Lista suspensa no celular.** O evento `select` agora leva o `nodeId` do rrweb do `<select>` tocado
+   no espelho; na tela da pessoa o elemento é achado por `record.mirror.getNode(nodeId)`, e as coordenadas
+   ficam só como reserva. Verificado num Chromium real: com coordenadas erradas o valor ainda troca.

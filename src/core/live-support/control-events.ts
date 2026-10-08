@@ -9,9 +9,10 @@ export type ControlEvent =
   | { type: "click"; xFrac: number; yFrac: number }
   | { type: "key"; key: string }
   /** Escolha de uma opção de um <select> nativo (cuja lista o navegador desenha
-   * fora da página e por isso não aparece no espelho): o <select> está no ponto
-   * (`xFrac`,`yFrac`) e `index` é a posição da opção escolhida. */
-  | { type: "select"; xFrac: number; yFrac: number; index: number }
+   * fora da página e por isso não aparece no espelho): `index` é a posição da opção
+   * escolhida; o <select> é achado por `nodeId` (id do rrweb, exato) ou, na falta, pelo
+   * ponto (`xFrac`,`yFrac`). */
+  | { type: "select"; xFrac: number; yFrac: number; index: number; nodeId?: number }
   /** Texto digitado no campo "Digitar na tela da pessoa" (celular): apaga
    * `deleteCount` caracteres do fim do campo focado e acrescenta `text`. */
   | { type: "text"; text: string; deleteCount: number }

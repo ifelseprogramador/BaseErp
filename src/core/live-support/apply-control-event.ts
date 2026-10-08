@@ -34,12 +34,15 @@ export function applyControlEvent(event: ControlEvent, cursorEl: HTMLElement | n
   }
 
   if (event.type === "select") {
-    const select = document.elementFromPoint(x, y)?.closest("select");
-    const option = select?.options[event.index];
-    if (select && option && !option.disabled) {
-      select.selectedIndex = event.index;
-      select.dispatchEvent(new Event("input", { bubbles: true }));
-      select.dispatchEvent(new Event("change", { bubbles: true }));
+    const byPoint = () => document.elementFromPoint(x, y)?.closest("select") ?? null;
+    if (event.nodeId === undefined) {
+      commitSelect(byPoint(), event.index);
+    } else {
+      // O `<select>` exato (o que o dono tocou no espelho), pelo id do rrweb — não
+      // depende de as coordenadas do espelho e da página baterem ao pixel.
+      void findRecordedSelect(event.nodeId).then((node) =>
+        commitSelect(node ?? byPoint(), event.index),
+      );
     }
     return;
   }
@@ -59,6 +62,25 @@ export function applyControlEvent(event: ControlEvent, cursorEl: HTMLElement | n
   if (event.type === "scroll") {
     window.scrollBy(event.deltaX, event.deltaY);
   }
+}
+
+async function findRecordedSelect(nodeId: number): Promise<HTMLSelectElement | null> {
+  try {
+    const { record } = await import("rrweb");
+    const node = record.mirror.getNode(nodeId);
+    return node instanceof HTMLSelectElement ? node : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Escolhe a opção `index` e avisa o formulário (input + change). */
+function commitSelect(select: HTMLSelectElement | null, index: number) {
+  const option = select?.options[index];
+  if (!select || !option || option.disabled) return;
+  select.selectedIndex = index;
+  select.dispatchEvent(new Event("input", { bubbles: true }));
+  select.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 /**
