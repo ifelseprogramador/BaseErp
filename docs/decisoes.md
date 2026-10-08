@@ -1217,3 +1217,11 @@ produção que a Vercel expõe); e, nas ações do painel do dono (`registerTele
 `getTelegramWebhookStatus`), o host pelo qual ele acessa agora — nunca localhost. Se o bot ainda
 aponta para um endereço de teste (ngrok), clicar em "Ativar respostas pelo Telegram" no domínio de
 produção o reaponta.
+
+## 2026-10-07 — Listas suspensas nativas no modo noturno
+
+O `<select>` nativo (lembrete de backup, filtros, formulários) tem fundo transparente e herda a cor do
+texto; a lista aberta é desenhada pelo navegador e, no modo noturno, aparecia branca com texto claro.
+Em `globals.css` (`@layer base`): `.dark select { color-scheme: dark }` (o navegador desenha a lista
+escura) e `select option` usa `--popover`/`--popover-foreground`. Vale para todo `<select>` do sistema,
+sem mexer em cada tela.

@@ -24,6 +24,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.15.2",
+    date: "2026-10-07",
+    changes: [
+      {
+        type: "correcao",
+        text: "Modo noturno: as listas suspensas (como a do lembrete de backup) deixaram de abrir brancas e ilegíveis.",
+      },
+    ],
+  },
+  {
     version: "0.15.1",
     date: "2026-10-07",
     changes: [

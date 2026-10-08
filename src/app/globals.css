@@ -133,4 +133,13 @@
   html {
     @apply font-sans;
   }
+  /* Listas suspensas nativas (<select>): quem desenha a lista aberta é o navegador/sistema.
+     Sem isto, no modo noturno ela abria branca com texto claro e não dava para ler. */
+  .dark select {
+    color-scheme: dark;
+  }
+  select option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
 }
