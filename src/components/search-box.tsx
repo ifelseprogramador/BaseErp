@@ -34,7 +34,7 @@ export function SearchBox({
       params.delete("q");
     }
     startTransition(() => {
-      router.replace(`${pathname}?${params.toString()}`);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     });
   }
 

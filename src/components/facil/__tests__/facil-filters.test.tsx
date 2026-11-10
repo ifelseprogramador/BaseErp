@@ -37,7 +37,7 @@ describe("FacilFilters", () => {
     search = "q=ana";
     render(<FacilFilters filters={filters} sortOptions={sortOptions} defaultSort="created_desc" />);
     fireEvent.click(screen.getByRole("button", { name: "Empresa" }));
-    expect(replace).toHaveBeenCalledWith("/clientes?q=ana&type=pj");
+    expect(replace).toHaveBeenCalledWith("/clientes?q=ana&type=pj", { scroll: false });
   });
 
   it("'Todos' remove o parâmetro e marca a opção ativa", () => {
@@ -47,13 +47,13 @@ describe("FacilFilters", () => {
       "true",
     );
     fireEvent.click(screen.getByRole("button", { name: "Todos os tipos" }));
-    expect(replace).toHaveBeenCalledWith("/clientes");
+    expect(replace).toHaveBeenCalledWith("/clientes", { scroll: false });
   });
 
   it("a ordem padrão não vai para a URL; outra ordem vai", () => {
     render(<FacilFilters filters={filters} sortOptions={sortOptions} defaultSort="created_desc" />);
     fireEvent.change(screen.getByLabelText("Ordenar por"), { target: { value: "name_asc" } });
-    expect(replace).toHaveBeenCalledWith("/clientes?sort=name_asc");
+    expect(replace).toHaveBeenCalledWith("/clientes?sort=name_asc", { scroll: false });
   });
 
   it("'Limpar filtros' só aparece com filtro ativo e zera tudo", () => {
@@ -63,6 +63,6 @@ describe("FacilFilters", () => {
     search = "type=pf&sort=name_asc&q=x";
     render(<FacilFilters filters={filters} sortOptions={sortOptions} defaultSort="created_desc" />);
     fireEvent.click(screen.getByText("Limpar filtros"));
-    expect(replace).toHaveBeenCalledWith("/clientes?q=x");
+    expect(replace).toHaveBeenCalledWith("/clientes?q=x", { scroll: false });
   });
 });

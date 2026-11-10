@@ -32,7 +32,7 @@ export function FacilFilters({
     else params.delete(key);
     const query = params.toString();
     startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname);
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     });
   }
 
@@ -46,7 +46,7 @@ export function FacilFilters({
     params.delete("sort");
     const query = params.toString();
     startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname);
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     });
   }
 

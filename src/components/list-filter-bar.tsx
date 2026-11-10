@@ -58,7 +58,7 @@ export function ListFilterBar({
       params.delete(key);
     }
     startTransition(() => {
-      router.replace(`${pathname}?${params.toString()}`);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     });
   }
 
