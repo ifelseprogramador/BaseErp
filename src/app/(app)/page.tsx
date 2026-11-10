@@ -1,6 +1,11 @@
 import { Building2, LayoutDashboard, Package, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getActiveOrg } from "@/core/auth";
+import { getActiveOrg, withOrg } from "@/core/auth";
+import { getEnabledModulesForOrg } from "@/core/module-settings";
+import { filterModulesByAccess } from "@/core/module-access";
+import { getUiMode } from "@/core/profile/ui-mode";
+import { FacilGrid } from "@/components/layout/facil-grid";
+import { FacilPage } from "@/components/facil/facil-page";
 
 /**
  * Dashboard-SHELL: só o layout de KPI cards, sem nenhum dado real —
@@ -8,6 +13,9 @@ import { getActiveOrg } from "@/core/auth";
  * então não existe um `get<Modulo>DashboardSummary()` pra alimentar isto.
  *
  * Um vertical nascido deste template deve:
+ *   0. REGRA: métricas do painel existem nos DOIS layouts (Formal e Fácil). Crie
+ *      `painel-data.ts#loadPainelData` (fonte única) e use-o aqui e em
+ *      `inicio-facil.tsx` (ver docs/decisoes.md).
  *   1. Trocar os `<KpiCardPlaceholder>` abaixo por `<KpiCard>` reais,
  *      chamando `get<Modulo>DashboardSummary()` exportado pelo barrel de
  *      cada módulo (`modules/<modulo>/index.ts`) — ver o padrão em
@@ -18,6 +26,32 @@ import { getActiveOrg } from "@/core/auth";
  */
 export default async function DashboardPage() {
   const org = await getActiveOrg();
+  const { userId, withDb } = await withOrg();
+  const uiMode = await withDb((tx) => getUiMode(tx, userId));
+
+  if (uiMode === "facil") {
+    // Mesmo filtro do menu: só o que esta pessoa pode abrir. Um vertical
+    // acrescenta aqui os `FacilKpi` dos resumos dos seus módulos (ver
+    // `components/facil/facil-kpi.tsx`) acima dos atalhos.
+    const modules = filterModulesByAccess(
+      await withDb((tx) => getEnabledModulesForOrg(tx, org.organizationId)),
+      org.moduleAccess,
+    );
+    return (
+      <FacilPage
+        title="O que você quer fazer?"
+        subtitle={org.organizationName}
+        icon={LayoutDashboard}
+      >
+        <FacilGrid
+          modules={modules}
+          isOwner={org.role === "owner"}
+          size="painel"
+          includePainel={false}
+        />
+      </FacilPage>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

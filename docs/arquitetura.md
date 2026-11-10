@@ -278,3 +278,14 @@ monitoramento externo. `api/cron/backup` protegido por `CRON_SECRET`,
 agendado via `vercel.json` (`crons`). Nenhum projeto Supabase real está
 vinculado a este template — quem nascer um vertical daqui cria o próprio
 projeto Supabase e preenche `.env.local` a partir de `.env.example`.
+
+## Modo de tela (formal/fácil)
+
+`core/ui-mode.ts` define os modos; `db/schema/user-preferences.ts` guarda a escolha por pessoa;
+`core/profile/ui-mode.ts#getUiMode` lê e `core/profile/actions.ts#setUiMode` grava (seletor em
+`core/profile/components/ui-mode-toggle.tsx`, na tela de Perfil). Ver "Modo de tela Fácil" em
+`docs/decisoes.md`.
+
+### Modo Fácil: componentes (`src/components/facil/`)
+
+`facil-tile` (cards-botão e paleta), `facil-kpi` (métricas), `facil-page` (moldura e home de módulo), `facil-list` (lista em cards), `facil-wizard` (assistente de etapas, `FacilField`, `FacilChoiceField`) e `facil-nav` (Início + "Todos os módulos"). As páginas escolhem a variante com `getCurrentUiMode()`; ver "Modo Fácil sem barra lateral" em `docs/decisoes.md`.

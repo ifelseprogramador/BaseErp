@@ -20,6 +20,7 @@ import { NotificationBell } from "@/core/notifications/components/notification-b
 import { listNotificationsForCurrentUser } from "@/core/notifications/queries";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { FacilNav } from "@/components/facil/facil-nav";
 import { VersionBadge } from "@/components/version-badge";
 import { BackupReminder } from "@/components/backup-reminder";
 import { getBackupReminderSettings, isBackupReminderDue } from "@/core/backup";
@@ -35,6 +36,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { QuickPrefs } from "@/components/layout/quick-prefs";
+import { getCurrentUiMode } from "@/core/profile/current-ui-mode";
 import { logout } from "@/app/(auth)/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -74,6 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     await withDb((tx) => getEnabledModulesForOrg(tx, org.organizationId)),
     org.moduleAccess,
   );
+  const uiMode = await getCurrentUiMode();
   const stopImpersonationWithId = stopImpersonation.bind(null, org.organizationId);
 
   // Nunca durante modo suporte: quem está "usando" a organização ali é o
@@ -89,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : null;
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col">
+    <div className="group/ui flex min-h-screen flex-1 flex-col" data-ui-mode={uiMode}>
       <OrgBrandingStyle primaryColor={org.primaryColor} sidebarColor={org.sidebarColor} />
       {org.impersonating && (
         <div className="flex items-center justify-between bg-amber-500 px-4 py-2 text-sm font-medium text-amber-950 print:hidden">
@@ -107,46 +111,54 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       )}
 
       <div className="flex flex-1">
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex print:hidden">
-          <div className="border-sidebar-border flex min-h-20 items-center gap-2 border-b px-4 py-3.5">
-            {org.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- URL dinâmica do Supabase Storage, fora do domínio de imagens do Next.
-              <img
-                src={org.logoUrl}
-                alt={org.organizationName}
-                className="h-16 w-auto max-w-full object-contain object-left"
-              />
-            ) : (
-              <>
-                <BrandIcon className="text-sidebar-primary h-5 w-5" />
-                <span className="font-semibold">{BRAND.name}</span>
-              </>
-            )}
-          </div>
-          <SidebarNav modules={modules} isOwner={org.role === "owner"} />
-          <div className="border-sidebar-border mt-auto flex flex-col gap-2 border-t px-2 py-2">
-            {/* A marca do vertical (ícone + nome — mesma dupla do topo
+        {/* Modo Fácil: sem barra lateral — só cards; "Todos os módulos" no topo faz o papel do menu. */}
+        {uiMode !== "facil" && (
+          <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex print:hidden">
+            <div className="border-sidebar-border flex min-h-20 items-center gap-2 border-b px-4 py-3.5">
+              {org.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- URL dinâmica do Supabase Storage, fora do domínio de imagens do Next.
+                <img
+                  src={org.logoUrl}
+                  alt={org.organizationName}
+                  className="h-16 w-auto max-w-full object-contain object-left"
+                />
+              ) : (
+                <>
+                  <BrandIcon className="text-sidebar-primary h-5 w-5" />
+                  <span className="font-semibold">{BRAND.name}</span>
+                </>
+              )}
+            </div>
+            <SidebarNav modules={modules} isOwner={org.role === "owner"} />
+            <div className="border-sidebar-border mt-auto flex flex-col gap-2 border-t px-2 py-2">
+              {/* A marca do vertical (ícone + nome — mesma dupla do topo
                 antes de escolher um logo próprio, e o mesmo ícone da
                 tela de login) só desce pra cá quando a organização já
                 tem um logo próprio ocupando o topo — sem isso, mostrar
                 duas vezes. */}
-            {org.logoUrl && (
-              <div className="text-sidebar-foreground/60 flex items-center gap-1.5 px-1 text-xs">
-                <BrandIcon className="h-3.5 w-3.5" />
-                <span>{BRAND.name}</span>
-              </div>
-            )}
-            <VersionBadge className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground" />
-          </div>
-        </aside>
+              {org.logoUrl && (
+                <div className="text-sidebar-foreground/60 flex items-center gap-1.5 px-1 text-xs">
+                  <BrandIcon className="h-3.5 w-3.5" />
+                  <span>{BRAND.name}</span>
+                </div>
+              )}
+              <VersionBadge className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground" />
+            </div>
+          </aside>
+        )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b px-4 py-3 print:hidden">
-            <div className="flex items-center gap-2">
-              <MobileNav modules={modules} isOwner={org.role === "owner"} />
-              <span className="text-sm font-medium">{displayName}</span>
-            </div>
+          <header className="flex items-center justify-between border-b px-4 py-3 group-data-[ui-mode=facil]/ui:py-4 print:hidden">
+            {uiMode === "facil" ? (
+              <FacilNav modules={modules} isOwner={org.role === "owner"} />
+            ) : (
+              <div className="flex items-center gap-2">
+                <MobileNav modules={modules} isOwner={org.role === "owner"} />
+                <span className="text-sm font-medium">{displayName}</span>
+              </div>
+            )}
             <div className="flex items-center gap-3">
+              <QuickPrefs uiMode={uiMode} />
               <NotificationBell organizationId={org.organizationId} initialItems={notifications} />
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -176,7 +188,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </header>
 
-          <main className="flex-1 p-4 md:p-6 print:p-0">
+          <main className="flex-1 p-4 group-data-[ui-mode=facil]/ui:mx-auto group-data-[ui-mode=facil]/ui:w-full group-data-[ui-mode=facil]/ui:max-w-5xl md:p-6 print:p-0">
             {backupReminder && (
               <BackupReminder
                 due={isBackupReminderDue(backupReminder, new Date())}

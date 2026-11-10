@@ -7,7 +7,9 @@ import { z } from "zod";
 import { withOrg } from "@/core/auth";
 import { createSupabaseServerClient } from "@/core/supabase/server";
 import { createSupabaseAdminClient } from "@/core/supabase/admin";
-import { organizations } from "@/db/schema";
+import { organizations, userPreferences } from "@/db/schema";
+import { isUiMode } from "@/core/ui-mode";
+import { isMissingTableError } from "@/core/profile/ui-mode";
 import type { ActionResult } from "@/core/action-result";
 
 const displayNameSchema = z.object({
@@ -334,5 +336,39 @@ export async function resetOrganizationLogo(): Promise<ActionResult> {
   log.info("perfil.branding.resetar_logo", { organizationId });
   revalidatePath("/", "layout");
   revalidatePath("/perfil");
+  return { ok: true };
+}
+
+/** Troca o modo de interface (formal/fácil) da própria pessoa. Preferência
+ * pessoal: grava só a linha de quem está logado (a RLS também garante). */
+export async function setUiMode(mode: string): Promise<ActionResult> {
+  if (!isUiMode(mode)) {
+    return { ok: false, message: "Modo inválido." };
+  }
+
+  const { userId, log, withDb } = await withOrg();
+  const now = new Date();
+  try {
+    await withDb((db) =>
+      db
+        .insert(userPreferences)
+        .values({ userId, uiMode: mode, updatedAt: now })
+        .onConflictDoUpdate({
+          target: userPreferences.userId,
+          set: { uiMode: mode, updatedAt: now },
+        }),
+    );
+  } catch (err) {
+    // Deploy fora de ordem (código novo antes da migration): avisa em vez de
+    // estourar. Ver `getUiMode`.
+    if (!isMissingTableError(err)) throw err;
+    return {
+      ok: false,
+      message: "Este recurso ainda está sendo ativado. Tente em alguns minutos.",
+    };
+  }
+
+  log.info("perfil.modo_interface", { mode });
+  revalidatePath("/", "layout");
   return { ok: true };
 }

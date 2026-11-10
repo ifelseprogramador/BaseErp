@@ -17,3 +17,4 @@ export * from "./schema/sharing";
 export * from "./schema/audit";
 export * from "./schema/platform-settings";
 export * from "./schema/login-history";
+export * from "./schema/user-preferences";

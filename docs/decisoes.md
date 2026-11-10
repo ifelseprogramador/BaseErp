@@ -1240,3 +1240,82 @@ sem mexer em cada tela.
 3. **Lista suspensa no celular.** O evento `select` agora leva o `nodeId` do rrweb do `<select>` tocado
    no espelho; na tela da pessoa o elemento é achado por `record.mirror.getNode(nodeId)`, e as coordenadas
    ficam só como reserva. Verificado num Chromium real: com coordenadas erradas o valor ainda troca.
+
+## 2026-10-30 — Modo de tela "Fácil" (interface para quem é leigo)
+
+Cada pessoa escolhe entre o layout **formal** (padrão, o de sempre) e o **fácil**: menu e Painel viram
+grades de botões grandes com desenho (ícone do lucide em círculo colorido) e animações leves, no estilo
+de sistemas de caixa/papelaria.
+
+1. **Preferência no banco, por pessoa.** Tabela `user_preferences` (`user_id` PK, `ui_mode`), sem
+   `organization_id`: a escolha acompanha a pessoa em qualquer aparelho e não é dado de tenancy. RLS
+   (`migrations-custom/0014`): cada pessoa lê, cria e altera só a própria linha; sem linha vale `formal`.
+   Diferente do tema (só localStorage), que continua como está.
+2. **Onde lê.** `app/(app)/layout.tsx` lê `getUiMode()` e põe `data-ui-mode` na raiz; o menu lateral
+   (`SidebarNav`/`MobileNav`) e o Painel (`app/(app)/page.tsx`) trocam para `FacilGrid`
+   (`components/layout/facil-grid.tsx`). A barra lateral fica mais larga (`group-data-[ui-mode=facil]/ui`).
+3. **Cores.** Escolhidas pela posição do item numa paleta fixa, não por módulo — módulo novo não precisa
+   declarar nada. Os ícones vêm do `iconName` do registry, como no menu formal.
+4. **Animações.** Só CSS (`tw-animate-css` + transições do Tailwind), nenhuma lib nova; todas com
+   `motion-safe`/`motion-reduce`, respeitando `prefers-reduced-motion`.
+5. **Escopo da primeira entrega.** Só menu e Painel. Telas internas (listas/formulários) ainda são iguais
+   nos dois modos; evoluem tela a tela nos verticais.
+6. **Propagação.** `components/layout/*` e `app/(app)/*` não entram na sincronização automática: replicar à
+   mão nos verticais (prisma, mecano-erp) e conferir com `scripts/check-drift.sh`.
+
+## 2026-11-09 — Modo Fácil sem barra lateral: cards, métricas e assistente passo a passo
+
+Refaz a primeira versão do modo Fácil (ver "Modo de tela Fácil", 2026-10-30), que só trocava o menu por uma grade. Agora a tela é feita só de cards.
+
+1. **Sem barra lateral.** No modo Fácil o `<aside>` nem é renderizado (`app/(app)/layout.tsx`); o topo ganha "Início" e "Todos os módulos" (`components/facil/facil-nav.tsx`), que abre uma folha com os módulos liberados (`FacilGrid` + `filterModulesByAccess`). O `SidebarNav`/`MobileNav` voltaram a ser só do modo formal.
+2. **Mesmas rotas, a página escolhe a variante.** `getCurrentUiMode()` (`core/profile/current-ui-mode.ts`, com `cache` do React para juntar layout e página numa consulta só) decide, em cada `page.tsx`, entre a tela formal e a Fácil. Links, `ModuleGuard`/`requireModule`, filtro de acesso e fila offline seguem valendo; nenhuma Server Action nem validação foi duplicada.
+3. **Peças compartilhadas** em `src/components/facil/`: `FacilTile`, `FacilKpi`, `FacilPage`/`FacilModuleHome`, `FacilList` (cards, nunca tabela; mostra os primeiros 12 e "Ver todos" em `?ver=todos`, porque as listas não têm paginação) e `FacilWizard`.
+4. **`FacilWizard` (regras que não podem mudar).** Todas as etapas ficam montadas (as outras só `hidden`) com os MESMOS `name` do formulário formal; o envio monta um único `FormData` e chama a MESMA action. Isso mantém o `UnsavedChangesGuard` (compara `FormData`) e o `parse*FormData`. O envio é manual (`formAction` numa transition), não `<form action>`: o React 19 zera os campos de um `<form action>` após qualquer retorno, e erro de validação nunca pode apagar o que estava certo. O formulário é `noValidate` e cada etapa é conferida ao avançar. Erro do servidor leva à primeira etapa com campo recusado.
+5. **Início e home de módulo com métricas.** Reaproveitam os `get*DashboardSummary` já existentes, cada bloco só para quem tem acesso ao módulo.
+6. **Escopo desta entrega.** Só o módulo Clientes está em cards; os demais módulos ainda abrem a tela formal mesmo no modo Fácil (a migração é módulo a módulo).
+7. **Propagação.** `components/layout/*`, `app/(app)/*` e `components/facil/*` não sincronizam sozinhos: replicados à mão nos três projetos.
+
+## 2026-11-09 — Modo Fácil: confirmação antes de salvar e demais módulos
+
+1. **Correção: o assistente salvava ao abrir a tela de conferência.** O "Avançar" da última etapa e o "Salvar" da revisão ocupam o mesmo lugar; o React reaproveitava o mesmo `<button>` e, no clique que abria a revisão, ele virava `type="submit"` antes de o navegador decidir o que fazer com o clique — o formulário era enviado sem a pessoa confirmar. Agora cada botão tem `key` próprio e o "Salvar" é `type="button"` com `onClick` (o envio só acontece por ele ou pelo Enter na revisão). Coberto por teste (`facil-wizard.test.tsx`). Regra: **nunca** deixar um botão de avanço e um de envio trocarem de `type` no mesmo elemento.
+2. **Peças novas** em `components/facil/`: `FacilPickField` (escolha de um item de lista longa, com busca; o que a busca esconde continua no `FormData`) e `FacilInfo` (linhas ícone·rótulo·valor da ficha). `FacilList` aceita item sem `href` (só leitura).
+3. **Escopo.** O que não é cadastro de negócio continua formal mesmo no modo Fácil: Perfil, Equipe, Backup.
+
+## 2026-11-09 — Modo Fácil: busca no servidor e cadastro na hora dentro do assistente
+
+Problema: o campo de escolha do assistente (`FacilPickField`) carregava TODOS os clientes na página e filtrava no navegador — não serve para cadastros grandes — e faltar um cliente, carro ou peça obrigava a sair do orçamento, cadastrar e voltar.
+
+1. **`FacilSearchField`** (`components/facil/facil-search.tsx`): busca **no servidor** (espera ~250 ms depois de digitar, ignora respostas atrasadas, limite de 20 resultados; sem texto mostra os 8 mais recentes). Guarda o escolhido num campo `required` com o `name` pedido — não pode ser `hidden`/`readOnly`, que ficam fora da validação do navegador. Cada `creates` vira um botão "＋ Cadastrar novo…" que abre um **mini-formulário na própria etapa**; ao salvar, o registro novo já fica escolhido.
+2. **Mini-formulário sem `name`**: os campos ficam fora do `FormData` do assistente e levam `data-facil-ignore`, para o assistente não conferi-los como se fossem da etapa nem tratar o Enter deles como "avançar" (Enter ali salva; no campo de busca escolhe o único resultado).
+3. **`FacilItemsField`**: lista de peças/serviços com busca no catálogo, cadastro de item novo, item avulso, quantidade (+/−, mínimo 1), preço editável e total. Envia tudo num único campo JSON (`itemsJson`, ver `serializeLines`); o servidor valida cada item pela MESMA regra do item avulso (`parse*ItemsPayload`).
+4. **Ações de servidor por módulo** em `modules/<m>/pick-actions.ts`: `search*ForPick` (consulta com `ILIKE`, curingas escapados, `limit`) e `quickCreate*` (montam um `FormData` e passam pela MESMA validação e pela MESMA gravação do cadastro completo — só não redirecionam). Chegam ao assistente como **props** da página: o módulo `ordens`/`pedidos` não importa `clientes`/`veiculos`/`catalogo`.
+5. **Criação com itens numa transação só**: `createWorkOrderRecord(data, id?, items)` / `createPedidoRecord(data, items)` inserem a OS/o pedido e os itens juntos e recalculam o total no servidor (ou existe tudo, ou nada). `createWorkOrderWithItems` / `createPedidoWithItems` são as actions do assistente; o caminho offline (`replay-handlers`) continua chamando as funções com 2 argumentos, sem mudança.
+6. **Offline**: a fila guarda só o cabeçalho. Com itens preenchidos e sem internet, o `parse` do plano B devolve erro no campo `itemsJson` (o assistente leva à etapa dos itens) em vez de descartá-los em silêncio.
+7. **Páginas** `novo` do modo Fácil decidem o modo ANTES de carregar `listCustomersForSelect()`/`listVehiclesForSelect()` — o ponto que travava com cadastros grandes.
+8. Os componentes vivem aqui para os verticais herdarem, mas o BaseERP ainda não tem módulo que os use.
+
+## 2026-11-09 — Erros do banco chegam embrulhados pelo Drizzle (`cause`)
+
+`core/db-errors.ts` (`pgErrorCode`, `isUniqueViolation`, `isForeignKeyViolation`) anda pela cadeia de `cause`: o Drizzle lança `DrizzleQueryError` ("Failed query: …") com o erro do Postgres em `err.cause`, então checar `err.code` direto nunca reconhece a violação. Regra: nunca checar `err.code` num erro vindo do `withDb`; use este utilitário. Achado no mecano-erp (placa duplicada) e replicado aqui por ser peça de `core`.
+
+## 2026-11-09 — "Mais dados (opcional)" em todos os cadastros rápidos
+
+Mesma ideia do veículo aplicada a todo "＋ Cadastrar novo…" de dentro dos assistentes: o essencial fica à vista e o resto é opcional, atrás de "Mais dados (opcional)" (`MiniField.advanced`).
+
+1. **Listas de campos compartilhadas** em `components/facil/mini-fields.ts` (`customerMiniFields`, `vehicleMiniFields`): um assistente novo que precise cadastrar cliente/veículo na hora usa a mesma lista, em vez de copiar campos. Os `key` são os `name` do cadastro completo, então o servidor segue passando por `parse*FormData`.
+2. **Regra para novo cadastro rápido**: `quickCreate*` copia para o `FormData` TODOS os campos do mini-formulário (vazio = não informado) e a validação do módulo trata `""`/`null` como ausente; sem isso o campo opcional vira erro num campo que a tela não mostra (ver a decisão de campo opcional ausente).
+3. O BaseERP guarda as listas compartilhadas e o componente, mas ainda não tem módulo com cadastro rápido.
+
+## 2026-11-09 — Paridade entre os layouts Formal e Fácil (regra permanente)
+
+**Regra:** tudo que existe num layout existe no outro; muda só a apresentação. Vale para todo projeto filho do BaseERP. Motivo: o painel Fácil do prisma nasceu sem várias medições do formal (entradas/saídas, aguardando aprovação, previsão de caixa, gráfico, pedidos recentes, clientes devendo) e o do mecano sem "Ordens por status" e "OS recentes".
+
+**Como:** o painel tem fonte única de dados, `app/(app)/painel-data.ts#loadPainelData`, usada por `page.tsx` (formal) e `inicio-facil.tsx` (Fácil). Métrica nova entra no loader e é desenhada nos DOIS (Fácil: `FacilKpi`/`FacilList`/seções com título). O mesmo vale para módulos: ação, campo e filtro novos entram no formulário/lista formal e no assistente/lista Fácil. Ao revisar uma mudança de tela, conferir os dois. Regra registrada em AGENTS.md/CLAUDE.md. O BaseERP (sem módulos) deixa o padrão pronto: ao criar o painel do vertical, criar `painel-data.ts` junto.
+
+## 2026-11-09 — Filtros/ordenação em toda lista e telas de configuração nos dois layouts
+
+Auditoria de paridade Formal × Fácil. Listas: o Fácil só tinha busca (e status em Pedidos/OS); agora toda lista tem busca + filtros + ordenação **nos dois layouts**, definidos uma vez em `modules/<m>/list-config.ts` (filtros, ordens e `parse…ListParams(searchParams)`), consumidos pela página formal (`ListFilterBar`) e pelo Fácil (`FacilFilters`, botões grandes). Comum a todos: filtro **Período** de cadastro (`?periodo=hoje|7d|30d|mes|ano`, `core/list-filters.ts`) → `since` nas queries (`createdAt >= since`). Específicos: clientes (tipo), veículos (ano), catálogo (tipo), OS (situação), prisma pedidos (status + pagamento: com saldo/atrasado/quitado + ordens por entrega/vencimento/saldo), financeiro (tipo, categoria, busca na descrição, ordem por data/valor — antes não tinha filtro na tela). Telas de configuração (perfil, equipe, backup, LGPD) ganharam apresentação Fácil via `ModePage`/`ModeSection` com o MESMO conteúdo dos formulários formais. Ficha de cliente/veículo/catálogo/OS/pedido já estavam em paridade.
+
+## 2026-11-09 — Nomes dos modos e atalhos no topo
+
+Os modos passam a se chamar **Clássico** (valor `formal`) e **Simples** (valor `facil`) para a pessoa; os valores gravados no banco não mudam. Os nomes e as dicas vivem em `core/ui-mode.ts` (`UI_MODE_LABELS`, `UI_MODE_HINTS`) — trocar o nome é editar só ali. O item duplicado "Modo de tela" saiu do menu do usuário (levava ao mesmo lugar que "Perfil"); no lugar entrou `components/layout/quick-prefs.tsx` no topo de toda tela: botão claro/escuro e botão que alterna Clássico ↔ Simples (grava na conta e dá `router.refresh()`).

@@ -24,6 +24,40 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.18.1",
+    date: "2026-11-09",
+    changes: [
+      {
+        type: "melhoria",
+        text: "Os modos de tela agora se chamam Clássico (menu ao lado e tabelas) e Simples (botões grandes e passo a passo). No topo de toda tela há atalhos para trocar entre tema claro e escuro e entre os dois modos, sem precisar abrir o Perfil.",
+      },
+      {
+        type: "correcao",
+        text: 'Modo "Simples": o cadastro passo a passo não salva mais antes de você conferir. Agora ele só salva quando você toca em "Salvar", na tela "Está tudo certo?".',
+      },
+    ],
+  },
+  {
+    version: "0.18.0",
+    date: "2026-11-09",
+    changes: [
+      {
+        type: "novo",
+        text: 'Modo "Simples" redesenhado: sem menu lateral, só cards grandes com ícones animados. O botão "Todos os módulos", no topo, leva a qualquer módulo de qualquer tela, e o Início passa a mostrar as métricas principais.',
+      },
+    ],
+  },
+  {
+    version: "0.17.0",
+    date: "2026-10-30",
+    changes: [
+      {
+        type: "novo",
+        text: 'Modo "Simples": em Perfil → Modo de tela, escolha entre o visual clássico de sempre e um visual com botões grandes, desenhos coloridos e animações leves, mais simples para quem não tem costume com sistemas. A escolha fica salva na sua conta, em qualquer aparelho.',
+      },
+    ],
+  },
+  {
     version: "0.16.0",
     date: "2026-10-07",
     changes: [
