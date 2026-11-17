@@ -24,6 +24,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.18.2",
+    date: "2026-11-16",
+    changes: [
+      {
+        type: "correcao",
+        text: "Busca e filtros das listas (modos Clássico e Fácil) mantêm exatamente o ponto da tela onde você estava, em vez de voltar ao topo quando a lista é recarregada.",
+      },
+      {
+        type: "melhoria",
+        text: 'Modo Fácil: o ícone "?" de ajuda pode ser maior, com área de toque maior.',
+      },
+      {
+        type: "correcao",
+        text: "Removido um aviso do React 19 no console durante o desenvolvimento, causado pelo controle de tema claro/escuro.",
+      },
+      {
+        type: "melhoria",
+        text: "Área do dono: ao criar uma organização, os módulos já saem habilitados conforme o ramo, quando o sistema tiver um padrão para ele.",
+      },
+    ],
+  },
+  {
     version: "0.18.1",
     date: "2026-11-09",
     changes: [

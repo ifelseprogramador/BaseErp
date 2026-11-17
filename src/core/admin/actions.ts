@@ -10,6 +10,7 @@ import { recordAudit } from "./audit";
 import { IMPERSONATION_COOKIE, IMPERSONATION_MAX_AGE_SECONDS } from "@/core/impersonation";
 import type { ActionResult } from "@/core/action-result";
 import { generateTemporaryPassword } from "@/core/temp-password";
+import { getBusinessTypePreset } from "@/core/business-type-presets";
 import {
   auditLog,
   loginEvents,
@@ -136,6 +137,28 @@ export async function createOrganization(
         .insert(memberships)
         .values({ userId: ownerId, organizationId: org.id, role: "owner" })
         .onConflictDoNothing();
+
+      // Preset de módulos por ramo (ver core/business-type-presets.ts): só
+      // decide o que fica HABILITADO por padrão ao criar a organização — a
+      // partir daí o admin liga/desliga cada módulo livremente.
+      const preset = getBusinessTypePreset(businessType);
+      if (preset) {
+        await db
+          .insert(organizationModuleSettings)
+          .values(
+            preset.defaultModuleSlugs.map((moduleSlug) => ({
+              organizationId: org.id,
+              moduleSlug,
+              enabled: true,
+            })),
+          )
+          .onConflictDoNothing();
+        log.info("admin.organizacao.criar.preset_aplicado", {
+          organizationId: org.id,
+          businessType,
+          modules: preset.defaultModuleSlugs,
+        });
+      }
 
       log.info("admin.organizacao.criar.sucesso", { organizationId: org.id, ownerId });
       await recordAudit(db, {

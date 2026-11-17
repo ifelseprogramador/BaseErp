@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useKeepScroll } from "@/core/use-keep-scroll";
 import { ArrowUpDown, FilterX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FilterField, FilterOption } from "@/components/list-filter-bar";
@@ -21,19 +20,13 @@ export function FacilFilters({
   sortOptions: FilterOption[];
   defaultSort: string;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [pending, startTransition] = useTransition();
+  const { navegar, pending, searchParams } = useKeepScroll();
 
   function setParam(key: string, value: string | null) {
     const params = new URLSearchParams(searchParams);
     if (value) params.set(key, value);
     else params.delete(key);
-    const query = params.toString();
-    startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-    });
+    navegar(params.toString());
   }
 
   const active =
@@ -44,10 +37,7 @@ export function FacilFilters({
     const params = new URLSearchParams(searchParams);
     for (const f of filters) params.delete(f.param);
     params.delete("sort");
-    const query = params.toString();
-    startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-    });
+    navegar(params.toString());
   }
 
   return (

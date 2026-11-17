@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useKeepScroll } from "@/core/use-keep-scroll";
 import { ArrowUpDown } from "lucide-react";
 import {
   Select,
@@ -45,10 +44,7 @@ export function ListFilterBar({
   sortOptions: FilterOption[];
   defaultSort: string;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
+  const { navegar, searchParams } = useKeepScroll();
 
   function setParam(key: string, value: string, omitWhen: string) {
     const params = new URLSearchParams(searchParams);
@@ -57,9 +53,7 @@ export function ListFilterBar({
     } else {
       params.delete(key);
     }
-    startTransition(() => {
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    });
+    navegar(params.toString());
   }
 
   return (

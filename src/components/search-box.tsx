@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useKeepScroll } from "@/core/use-keep-scroll";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,11 +19,8 @@ export function SearchBox({
   placeholder: string;
   large?: boolean;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const { navegar, searchParams } = useKeepScroll();
   const [value, setValue] = useState(searchParams.get("q") ?? "");
-  const [, startTransition] = useTransition();
 
   function handleChange(next: string) {
     setValue(next);
@@ -33,9 +30,7 @@ export function SearchBox({
     } else {
       params.delete("q");
     }
-    startTransition(() => {
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    });
+    navegar(params.toString());
   }
 
   return (

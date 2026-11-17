@@ -19,6 +19,7 @@ import { listLoginEvents, listOrganizationsForAdmin } from "@/core/admin/queries
 import { listPendingUserRequestsForAdmin } from "@/core/live-support/queries";
 import { isTelegramConfigured } from "@/core/telegram";
 import { SupportSettingsCard } from "@/core/admin/components/support-settings-card";
+import { getBusinessTypePresets } from "@/core/business-type-presets";
 import { NewOrganizationForm } from "@/core/admin/components/new-organization-form";
 import { LoginHistoryCard } from "@/core/admin/components/login-history-card";
 import { SupportInbox } from "@/core/admin/components/support-inbox";
@@ -47,7 +48,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps<"/a
             <DatabaseBackup className="h-4 w-4" />
             Backup do sistema
           </Button>
-          <NewOrganizationForm />
+          <NewOrganizationForm businessTypePresets={getBusinessTypePresets()} />
         </div>
       </div>
 

@@ -39,6 +39,10 @@
 # `core/brand.ts`, e `sidebar-nav.tsx` do Prisma tem o item de menu de
 # LGPD, que o BaseERP nem tem módulo pra ter).
 FOUNDATION_PATHS=(
+  "src/core/use-keep-scroll.ts"
+  "src/core/__tests__/use-keep-scroll.test.tsx"
+  "src/core/business-type-presets.ts"
+  "src/components/facil/facil-filters.tsx"
   "src/core/auth.ts"
   "src/core/module-access.ts"
   "src/core/temp-password.ts"
