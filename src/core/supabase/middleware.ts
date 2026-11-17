@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireEnv } from "@/core/env";
+import { EXTRA_PUBLIC_PATHS } from "./public-paths-extra";
 
 // "/d/" = link público de documento compartilhado com o cliente (core/share).
 // "/api/cron/" = rotas do Vercel Cron (sem sessão de usuário; cada uma exige
@@ -9,11 +10,13 @@ import { requireEnv } from "@/core/env";
 // cron receberia um redirecionamento para /login em vez de rodar).
 // "/api/telegram/webhook" = respostas do dono pelo Telegram (a rota valida o
 // segredo do cabeçalho e o chat do dono por conta própria).
+// Rotas públicas de um VERTICAL (ex.: retorno de provedor externo) ficam em
+// `./public-paths-extra.ts`, arquivo que cada vertical edita sem tocar neste.
 const PUBLIC_PATHS = ["/login", "/d/", "/api/cron/", "/api/telegram/webhook"];
 
 /** O caminho dispensa sessão de usuário? (Puro, para teste.) */
 export function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+  return [...PUBLIC_PATHS, ...EXTRA_PUBLIC_PATHS].some((path) => pathname.startsWith(path));
 }
 
 /**

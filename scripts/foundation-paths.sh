@@ -39,6 +39,7 @@
 # `core/brand.ts`, e `sidebar-nav.tsx` do Prisma tem o item de menu de
 # LGPD, que o BaseERP nem tem módulo pra ter).
 FOUNDATION_PATHS=(
+  "src/core/supabase/public-paths-extra.ts"
   "src/core/use-keep-scroll.ts"
   "src/core/__tests__/use-keep-scroll.test.tsx"
   "src/core/business-type-presets.ts"
@@ -188,16 +189,16 @@ FOUNDATION_EXCLUDE_PATHS=(
 # via sync reverso antes desta exceção existir, revertido na hora).
 #
 # prisma-revestimentos-erp: divergências INTENCIONAIS do vertical.
-# `core/supabase/middleware.ts` (+ teste) libera `/api/webhooks/fiscal/` (rota do
-# módulo fiscal, que o BaseERP não tem): sincronizar de qualquer lado apagaria o
-# aviso do provedor de notas ou vazaria a rota para o template. `share/template.ts`
-# só troca a frase de exemplo. `brand-icon.tsx` aceita `paths` (selo do segmento no
-# login). `login/page.tsx` mostra esse selo. `organizacoes/[id]/page.tsx` tem o card
-# "Provedor de notas fiscais". `(app)/layout.tsx` tem o logo da loja e o botão
-# "Venda rápida". Quando uma dessas peças ganhar uma versão genérica no BaseERP,
-# tire o caminho daqui.
+# `core/supabase/public-paths-extra.ts` é o arquivo de rotas públicas DO VERTICAL
+# (retorno do provedor de notas fiscais): o BaseERP sincroniza um arquivo vazio
+# para os demais, e aqui ele não pode ser sobrescrito. `share/template.ts` só
+# troca a frase de exemplo. `brand-icon.tsx` aceita `paths` (selo do segmento no
+# login). `login/page.tsx` mostra esse selo. `organizacoes/[id]/page.tsx` tem o
+# card "Provedor de notas fiscais". `(app)/layout.tsx` tem o logo da loja e o
+# botão "Venda rápida". Quando uma dessas peças ganhar uma versão genérica no
+# BaseERP, tire o caminho daqui.
 declare -A VERTICAL_PATH_EXCLUDES=(
-  [prisma-revestimentos-erp]="src/core/supabase/middleware.ts src/core/supabase/__tests__/middleware-paths.test.ts src/core/share/template.ts src/components/brand-icon.tsx src/app/(auth)/login/page.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx"
+  [prisma-revestimentos-erp]="src/core/supabase/public-paths-extra.ts src/core/share/template.ts src/components/brand-icon.tsx src/app/(auth)/login/page.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx"
   [mecano-erp]="src/components/stale-service-worker-cleanup.tsx src/app/layout.tsx src/app/(admin)/admin/organizacoes/[id]/page.tsx src/app/(app)/layout.tsx src/app/(app)/perfil/page.tsx src/app/(auth)/login/page.tsx src/db/schema/tenancy.ts src/core/admin/validation.ts src/core/profile/actions.ts src/core/team/actions.ts"
 )
 

@@ -1319,3 +1319,13 @@ Auditoria de paridade Formal × Fácil. Listas: o Fácil só tinha busca (e stat
 ## 2026-11-09 — Nomes dos modos e atalhos no topo
 
 Os modos passam a se chamar **Clássico** (valor `formal`) e **Simples** (valor `facil`) para a pessoa; os valores gravados no banco não mudam. Os nomes e as dicas vivem em `core/ui-mode.ts` (`UI_MODE_LABELS`, `UI_MODE_HINTS`) — trocar o nome é editar só ali. O item duplicado "Modo de tela" saiu do menu do usuário (levava ao mesmo lugar que "Perfil"); no lugar entrou `components/layout/quick-prefs.tsx` no topo de toda tela: botão claro/escuro e botão que alterna Clássico ↔ Simples (grava na conta e dá `router.refresh()`).
+
+## 2026-11-16 — Rotas públicas extras por vertical (`core/supabase/public-paths-extra.ts`)
+
+`core/supabase/middleware.ts` tinha a lista de rotas sem sessão fixa; um vertical que precisasse de uma (ex.: retorno de um
+provedor externo, como o aviso de notas fiscais do Prisma Revestimentos) tinha que editar o arquivo e o excluir da
+sincronização, deixando de receber suas melhorias. Agora o template mantém `PUBLIC_PATHS` e soma `EXTRA_PUBLIC_PATHS` de
+`public-paths-extra.ts` (vazio no BaseERP, arquivo DO vertical, protegido por `VERTICAL_PATH_EXCLUDES` onde for preenchido).
+Não usa o registro de módulos de propósito: o `proxy.ts` não importa `load-modules`, e o registro só é preenchido quando o
+código dos módulos é carregado; importá-los no proxy traria banco e `server-only` para cada request. Cada rota listada
+continua responsável por se autenticar (token, segredo).

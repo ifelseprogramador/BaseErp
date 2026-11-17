@@ -24,3 +24,16 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/api/telegram")).toBe(false);
   });
 });
+
+describe("rotas públicas extras de um vertical", () => {
+  it("o que o vertical lista em public-paths-extra também dispensa sessão", async () => {
+    vi.resetModules();
+    vi.doMock("../public-paths-extra", () => ({ EXTRA_PUBLIC_PATHS: ["/api/webhooks/x/"] }));
+    const { isPublicPath: com } = await import("../middleware");
+    expect(com("/api/webhooks/x/token")).toBe(true);
+    expect(com("/api/webhooks/y/token")).toBe(false);
+    expect(com("/login")).toBe(true);
+    vi.doUnmock("../public-paths-extra");
+    vi.resetModules();
+  });
+});
