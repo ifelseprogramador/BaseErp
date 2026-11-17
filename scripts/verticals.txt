@@ -3,3 +3,4 @@
 # por linha, absoluto. Linhas em branco e começando com `#` são ignoradas.
 /home/eduardo/code/prisma
 /home/eduardo/code/mecano-erp
+/home/eduardo/code/prisma-revestimentos-erp
