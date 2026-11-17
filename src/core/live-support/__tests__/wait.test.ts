@@ -6,7 +6,11 @@ import {
   MIN_SUPPORT_WAIT_SECONDS,
   ADMIN_REQUEST_TTL_MINUTES,
   clampWaitSeconds,
+  ADMIN_HEARTBEAT_INTERVAL_MS,
+  ADMIN_IDLE_PAUSE_MS,
+  ADMIN_ONLINE_WINDOW_SECONDS,
   computeAdminRequestExpiresAt,
+  shouldSendAdminHeartbeat,
   computeExpiresAt,
   formatSupportAlert,
   isRequestExpired,
@@ -91,6 +95,40 @@ describe("computeAdminRequestExpiresAt", () => {
     const requestedAt = new Date("2026-10-06T18:00:00.000Z");
     expect(computeAdminRequestExpiresAt(requestedAt).getTime() - requestedAt.getTime()).toBe(
       ADMIN_REQUEST_TTL_MINUTES * 60_000,
+    );
+  });
+});
+
+describe("shouldSendAdminHeartbeat (economia de chamadas)", () => {
+  const T = 1_000_000_000;
+  const base = {
+    now: T,
+    lastBeatAt: null as number | null,
+    lastActivityAt: T - 1_000,
+    visible: true,
+  };
+
+  it("bate quando a aba está visível, a pessoa está presente e ninguém bateu", () => {
+    expect(shouldSendAdminHeartbeat(base)).toBe(true);
+  });
+  it("não bate com a aba em segundo plano", () => {
+    expect(shouldSendAdminHeartbeat({ ...base, visible: false })).toBe(false);
+  });
+  it("não bate se outra aba bateu há menos de 80% do intervalo, e bate depois disso", () => {
+    expect(shouldSendAdminHeartbeat({ ...base, lastBeatAt: T - 30_000 })).toBe(false);
+    expect(shouldSendAdminHeartbeat({ ...base, lastBeatAt: T - 49_000 })).toBe(true);
+  });
+  it("para quando a pessoa está ausente há mais de 20 min", () => {
+    expect(shouldSendAdminHeartbeat({ ...base, lastActivityAt: T - ADMIN_IDLE_PAUSE_MS - 1 })).toBe(
+      false,
+    );
+    expect(shouldSendAdminHeartbeat({ ...base, lastActivityAt: T - ADMIN_IDLE_PAUSE_MS + 1 })).toBe(
+      true,
+    );
+  });
+  it("a janela de online comporta uma batida perdida", () => {
+    expect(ADMIN_ONLINE_WINDOW_SECONDS * 1000).toBeGreaterThanOrEqual(
+      2 * ADMIN_HEARTBEAT_INTERVAL_MS,
     );
   });
 });

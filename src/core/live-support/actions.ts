@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { withOrg, getSession } from "@/core/auth";
 import { requireAdmin } from "@/core/admin-auth";
 import { isPlatformAdmin } from "@/core/platform-admin";
@@ -31,6 +31,7 @@ import {
   userSupportChannelName,
 } from "./realtime";
 import {
+  ADMIN_HEARTBEAT_MIN_GAP_SECONDS,
   ADMIN_ONLINE_WINDOW_SECONDS,
   DEFAULT_SUPPORT_WAIT_SECONDS,
   clampWaitSeconds,
@@ -952,17 +953,25 @@ export async function listSupportMessages(
 }
 
 /**
- * Batida de presença do painel `/admin` (a cada ~20 s, ver
+ * Batida de presença do painel `/admin` (a cada ~60 s, só com a pessoa presente, ver
  * `core/admin/components/admin-presence-beacon.tsx`). É isto que o "Chamar
  * suporte" consulta para saber se há alguém online.
  */
 export async function adminHeartbeat(): Promise<ActionResult> {
   const { userId, withDb } = await requireAdmin();
+  // Uma batida que chega logo depois de outra (várias abas/aparelhos) não escreve:
+  // a condição vai no próprio UPDATE, sem leitura extra.
+  const limite = new Date(Date.now() - ADMIN_HEARTBEAT_MIN_GAP_SECONDS * 1000);
   await withDb((db) =>
     db
       .update(platformAdmins)
       .set({ lastSeenAt: new Date() })
-      .where(eq(platformAdmins.userId, userId)),
+      .where(
+        and(
+          eq(platformAdmins.userId, userId),
+          or(isNull(platformAdmins.lastSeenAt), lt(platformAdmins.lastSeenAt, limite)),
+        ),
+      ),
   );
   return { ok: true };
 }

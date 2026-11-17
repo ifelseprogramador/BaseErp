@@ -9,10 +9,42 @@ export const DEFAULT_SUPPORT_WAIT_SECONDS = 30;
 export const MIN_SUPPORT_WAIT_SECONDS = 5;
 export const MAX_SUPPORT_WAIT_SECONDS = 300;
 
-/** "Online" = o painel /admin bateu presença há menos que isto (a batida
- * vem a cada ~20 s; 45 s tolera uma batida perdida). */
-export const ADMIN_ONLINE_WINDOW_SECONDS = 45;
-export const ADMIN_HEARTBEAT_INTERVAL_MS = 20_000;
+/** "Online" = o painel /admin bateu presença há menos que isto. A batida vem a
+ * cada ~60 s; 150 s (2,5 batidas) tolera uma batida perdida. Se o dono fecha o
+ * painel, o sistema ainda o considera online por até esse tempo: o cliente espera
+ * `support_wait_seconds` e, sem atendimento, o pedido vira "perdido" e o Telegram
+ * avisa, como sempre. É o preço de poupar chamadas à Vercel e ao Supabase. */
+export const ADMIN_ONLINE_WINDOW_SECONDS = 150;
+export const ADMIN_HEARTBEAT_INTERVAL_MS = 60_000;
+/** O servidor ignora uma batida que chega menos de N s depois da anterior (várias
+ * abas/aparelhos do mesmo dono): o UPDATE nem acontece. */
+export const ADMIN_HEARTBEAT_MIN_GAP_SECONDS = 10;
+/** Sem mexer na tela (mouse, teclado, toque, rolagem) por tanto tempo, o painel
+ * para de bater: aba esquecida aberta não deve manter "online" nem gastar chamadas. */
+export const ADMIN_IDLE_PAUSE_MS = 20 * 60_000;
+
+/**
+ * Decide, no navegador e SEM rede, se esta aba deve bater presença agora. Só bate
+ * quando: a aba está visível; a pessoa mexeu na tela há menos de
+ * `ADMIN_IDLE_PAUSE_MS`; e ninguém (nem outra aba aberta do mesmo navegador)
+ * bateu há menos de 80% do intervalo. `lastBeatAt` é compartilhado entre abas.
+ */
+export function shouldSendAdminHeartbeat(input: {
+  now: number;
+  lastBeatAt: number | null;
+  lastActivityAt: number;
+  visible: boolean;
+}): boolean {
+  if (!input.visible) return false;
+  if (input.now - input.lastActivityAt > ADMIN_IDLE_PAUSE_MS) return false;
+  if (
+    input.lastBeatAt !== null &&
+    input.now - input.lastBeatAt < ADMIN_HEARTBEAT_INTERVAL_MS * 0.8
+  ) {
+    return false;
+  }
+  return true;
+}
 
 /**
  * Quanto um pedido que o ADMIN abriu (pedir acesso à tela) fica esperando a
