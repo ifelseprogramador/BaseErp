@@ -121,6 +121,7 @@ export function ShareDocumentButton({
         setOpen(false);
         return;
       }
+      if (r.message) toast.info(r.message);
       setResult(r);
       setTemplate(loadSavedTemplate(r.kind) ?? r.template ?? "");
       setEmail(r.recipient?.email ?? "");

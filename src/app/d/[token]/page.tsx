@@ -18,13 +18,23 @@ export default async function SharedDocumentPage({ params }: PageProps<"/d/[toke
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">{doc.issuerName}</h1>
-        {doc.issuerLines.map((l) => (
-          <p key={l} className="text-muted-foreground text-sm">
-            {l}
-          </p>
-        ))}
+      <header className="flex items-center gap-4 border-b-2 pb-4">
+        {doc.issuerLogoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- logotipo externo do cliente, sem otimização
+          <img
+            src={doc.issuerLogoUrl}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-lg object-contain"
+          />
+        )}
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-xl font-semibold">{doc.issuerName}</h1>
+          {doc.issuerLines.map((l) => (
+            <p key={l} className="text-muted-foreground text-sm">
+              {l}
+            </p>
+          ))}
+        </div>
       </header>
 
       <section className="flex flex-col gap-1 border-y py-4">
@@ -79,7 +89,10 @@ export default async function SharedDocumentPage({ params }: PageProps<"/d/[toke
             </thead>
             <tbody>
               {doc.table.rows.map((row, i) => (
-                <tr key={i} className="border-b">
+                <tr
+                  key={i}
+                  className={`border-b ${row[1] === "" && row[2] === "" ? "bg-muted/40 text-xs font-semibold tracking-wide" : "align-top"}`}
+                >
                   {row.map((cell, j) => (
                     <td
                       key={j}

@@ -27,6 +27,21 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number): stri
   return out;
 }
 
+/** Baixa o logotipo (PNG/JPG) com limite de tempo e tamanho; qualquer problema = sem logotipo. */
+async function baixarLogo(pdf: PDFDocument, url: string) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > 2_000_000) return null;
+    if (bytes[0] === 0x89 && bytes[1] === 0x50) return await pdf.embedPng(bytes);
+    if (bytes[0] === 0xff && bytes[1] === 0xd8) return await pdf.embedJpg(bytes);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Renderiza o documento em PDF (A4, várias páginas se precisar). */
 export async function renderSharePdf(doc: ShareDocument): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
@@ -81,8 +96,30 @@ export async function renderSharePdf(doc: ShareDocument): Promise<Uint8Array> {
     y -= 10;
   };
 
-  text(doc.issuerName, { size: 16, bold: true });
-  for (const l of doc.issuerLines) text(l, { color: gray });
+  // Cabeçalho "papel timbrado": logotipo (se houver e der para baixar) ao lado do nome e dos dados.
+  const logo = doc.issuerLogoUrl ? await baixarLogo(pdf, doc.issuerLogoUrl) : null;
+  const topo = y;
+  const LOGO = 52;
+  if (logo) {
+    const escala = Math.min(LOGO / logo.width, LOGO / logo.height);
+    page.drawImage(logo, {
+      x: PAGE.margin,
+      y: y - logo.height * escala,
+      width: logo.width * escala,
+      height: logo.height * escala,
+    });
+  }
+  const xTexto = logo ? PAGE.margin + LOGO + 12 : PAGE.margin;
+  text(doc.issuerName, {
+    size: 16,
+    bold: true,
+    x: xTexto,
+    maxWidth: width - (xTexto - PAGE.margin),
+  });
+  for (const l of doc.issuerLines) {
+    text(l, { color: gray, x: xTexto, maxWidth: width - (xTexto - PAGE.margin) });
+  }
+  if (logo) y = Math.min(y, topo - LOGO);
   y -= 8;
   rule();
   text(`${SHARE_KIND_LABELS[doc.kind]}${doc.number ? ` nº ${doc.number}` : ""}`, {
@@ -119,16 +156,20 @@ export async function renderSharePdf(doc: ShareDocument): Promise<Uint8Array> {
   if (doc.table) {
     y -= 8;
     const cols = doc.table.columns;
-    const firstW = width * 0.46;
+    // Tabela de 3 colunas (item · como foi calculado · valor): a do meio é a mais larga.
+    const frac = cols.length === 3 ? [0.3, 0.5, 0.2] : null;
+    const firstW = width * (frac ? frac[0] : 0.46);
     const restW = (width - firstW) / Math.max(cols.length - 1, 1);
-    const colX = cols.map((_, i) => PAGE.margin + (i === 0 ? 0 : firstW + (i - 1) * restW));
-    const colW = cols.map((_, i) => (i === 0 ? firstW : restW));
+    const colW = cols.map((_, i) => (frac ? width * frac[i] : i === 0 ? firstW : restW));
+    const colX = cols.map((_, i) => PAGE.margin + colW.slice(0, i).reduce((a, b) => a + b, 0));
     const drawRow = (cells: string[], isHeader: boolean) => {
-      const f = isHeader ? bold : font;
+      // Linha de grupo ("MATERIAL", "MÃO DE OBRA"): só o 1º campo preenchido.
+      const grupo = !isHeader && cells.length > 1 && cells.slice(1).every((c) => c === "");
+      const f = isHeader || grupo ? bold : font;
       const wrapped = cells.map((c, i) => wrap(safe(c ?? ""), f, 9, colW[i] - 6));
       const h = Math.max(...wrapped.map((w) => w.length), 1) * 12 + 4;
       ensure(h);
-      if (isHeader)
+      if (isHeader || grupo)
         page.drawRectangle({
           x: PAGE.margin,
           y: y - h,

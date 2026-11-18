@@ -15,6 +15,11 @@ export const shareDocumentSchema = z.object({
   number: z.string().max(40).optional(),
   issuerName: z.string().min(1).max(160),
   issuerLines: z.array(line).max(6).default([]),
+  /** Logotipo da empresa (papel timbrado), URL http(s) pública. Opcional. */
+  issuerLogoUrl: z
+    .url()
+    .refine((u) => /^https?:\/\//.test(u))
+    .optional(),
   customerName: z.string().max(160).optional(),
   customerLines: z.array(line).max(6).default([]),
   sections: z
