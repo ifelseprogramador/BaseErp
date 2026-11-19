@@ -20,7 +20,8 @@ export function SpreadsheetMenu({
   importHref,
   exportHref,
 }: {
-  importHref: string;
+  /** Sem `importHref` o menu só exporta (listas que não aceitam importação). */
+  importHref?: string;
   /** Rota de exportação; aceita `?formato=csv`. */
   exportHref: string;
 }) {
@@ -33,12 +34,14 @@ export function SpreadsheetMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Importar / exportar</DropdownMenuLabel>
+          <DropdownMenuLabel>{importHref ? "Importar / exportar" : "Exportar"}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem render={<a href={importHref} />}>
-            <Upload className="h-4 w-4" />
-            Importar de uma planilha
-          </DropdownMenuItem>
+          {importHref && (
+            <DropdownMenuItem render={<a href={importHref} />}>
+              <Upload className="h-4 w-4" />
+              Importar de uma planilha
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem render={<a href={exportHref} download />}>
             <Download className="h-4 w-4" />
             Exportar para Excel (.xlsx)
