@@ -53,6 +53,15 @@ export const shareDocumentSchema = z.object({
     .max(8)
     .default([]),
   notes: z.string().max(2000).optional(),
+  /**
+   * PDF OFICIAL anexado (ex.: DANFE da nota fiscal), em base64. Quando existe, o botão "Baixar PDF" entrega
+   * este arquivo em vez do PDF resumido gerado pelo sistema. Limite ~2 MB de arquivo.
+   */
+  officialPdfBase64: z
+    .string()
+    .max(2_800_000)
+    .regex(/^[A-Za-z0-9+/=]+$/)
+    .optional(),
   /** Links externos úteis (ex.: XML/DANFE de uma nota). Só http(s). */
   links: z
     .array(
