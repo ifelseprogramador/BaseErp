@@ -17,6 +17,10 @@ export const organizationBackupSettings = pgTable("organization_backup_settings"
   // modo suporte do dono da plataforma).
   reminderHours: integer("reminder_hours").notNull().default(3),
   lastDownloadAt: timestamp("last_download_at", { withTimezone: true }),
+  // Cópia no computador do DONO da plataforma: desligada por padrão; só o dono liga, cliente a cliente
+  // (`core/admin/actions.ts#setOwnerLocalBackup`). Não muda nada no servidor: só diz ao navegador do dono
+  // quais organizações ele deve gravar na pasta que escolheu.
+  ownerLocalBackup: boolean("owner_local_backup").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

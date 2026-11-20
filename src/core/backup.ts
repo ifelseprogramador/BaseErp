@@ -418,3 +418,34 @@ export async function markBackupDownloaded(db: Database, organizationId: string)
       set: { lastDownloadAt: now, updatedAt: now },
     });
 }
+
+/** Cópia no computador do dono da plataforma: sem linha de configuração = desligada. */
+export async function getOwnerLocalBackup(db: Database, organizationId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ on: organizationBackupSettings.ownerLocalBackup })
+    .from(organizationBackupSettings)
+    .where(eq(organizationBackupSettings.organizationId, organizationId))
+    .limit(1);
+  return row?.on ?? false;
+}
+
+export async function setOwnerLocalBackup(db: Database, organizationId: string, enabled: boolean) {
+  await db
+    .insert(organizationBackupSettings)
+    .values({ organizationId, ownerLocalBackup: enabled })
+    .onConflictDoUpdate({
+      target: organizationBackupSettings.organizationId,
+      set: { ownerLocalBackup: enabled, updatedAt: new Date() },
+    });
+}
+
+/** Organizações cujo backup o dono quer receber no computador dele (só as que ele ligou, uma a uma). */
+export async function listOrgsWithOwnerLocalBackup(
+  db: Database,
+): Promise<{ id: string; name: string }[]> {
+  return db
+    .select({ id: organizations.id, name: organizations.name })
+    .from(organizationBackupSettings)
+    .innerJoin(organizations, eq(organizations.id, organizationBackupSettings.organizationId))
+    .where(eq(organizationBackupSettings.ownerLocalBackup, true));
+}
