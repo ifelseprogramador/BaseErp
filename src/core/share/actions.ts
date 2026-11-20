@@ -9,7 +9,7 @@ import { encryptSecret } from "@/core/crypto";
 import { organizationEmailSettings, sharedDocuments } from "@/db/schema";
 import { shareDocumentSchema, SHARE_KIND_LABELS } from "./document";
 import { isAllowedSmtpHost, sendSmtpMail, verifySmtp } from "./email";
-import { renderSharePdf } from "./pdf";
+import { pdfDoDocumento } from "./pdf";
 
 const sendSchema = z.object({
   shareId: z.uuid(),
@@ -60,7 +60,7 @@ export async function sendShareByEmail(input: {
   if (!doc.success) return { ok: false, message: "Documento inválido." };
 
   try {
-    const pdf = await renderSharePdf(doc.data);
+    const pdf = await pdfDoDocumento(doc.data);
     const label = `${SHARE_KIND_LABELS[doc.data.kind]}${doc.data.number ? ` nº ${doc.data.number}` : ""}`;
     await sendSmtpMail(cfg, {
       to: parsed.data.to,

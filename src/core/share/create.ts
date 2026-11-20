@@ -102,14 +102,16 @@ export async function createSharedDocument(
   );
 
   const origin = await siteOrigin();
-  const url = `${origin}/d/${token}`;
+  // Documento com PDF oficial (nota fiscal): o link compartilhado (WhatsApp, copiar) abre o PDF OFICIAL direto,
+  // não a página-resumo do sistema.
+  const url = `${origin}/d/${token}${doc.officialPdfBase64 ? "/pdf" : ""}`;
   log.info("share.criar", { shareId: row.id, kind: doc.kind });
 
   return {
     ok: true,
     shareId: row.id,
     url,
-    pdfUrl: `${url}/pdf`,
+    pdfUrl: `${origin}/d/${token}/pdf`,
     kind: doc.kind,
     template: DEFAULT_SHARE_TEMPLATE,
     vars: {

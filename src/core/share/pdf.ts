@@ -42,6 +42,18 @@ async function baixarLogo(pdf: PDFDocument, url: string) {
   }
 }
 
+/**
+ * O PDF que o cliente recebe em QUALQUER canal (link, WhatsApp, e-mail, compartilhar): o PDF OFICIAL anexado
+ * ao documento (ex.: DANFE da nota fiscal), quando existe e é mesmo um PDF; senão, o resumo gerado aqui.
+ */
+export async function pdfDoDocumento(doc: ShareDocument): Promise<Uint8Array> {
+  if (doc.officialPdfBase64) {
+    const oficial = new Uint8Array(Buffer.from(doc.officialPdfBase64, "base64"));
+    if (oficial[0] === 0x25 && oficial[1] === 0x50) return oficial;
+  }
+  return renderSharePdf(doc);
+}
+
 /** Renderiza o documento em PDF (A4, várias páginas se precisar). */
 export async function renderSharePdf(doc: ShareDocument): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
